@@ -4,9 +4,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const KV_PREFIX = 'submgr-worker-';
 const KV_NAMESPACE_NAME = 'SUBMGR_KV';
-const KV_EXISTING_NS_NAME = KV_PREFIX + KV_NAMESPACE_NAME
 const WRANGLER_CONFIG_PATH = path.join(__dirname, '..', 'wrangler.jsonc');
 
 // 执行wrangler命令并返回结果
@@ -22,7 +20,7 @@ function runWranglerCommand(command) {
 
 // 检查KV namespace是否存在
 function checkKvNamespaceExists() {
-  console.log(`正在检查KV namespace "${KV_EXISTING_NS_NAME}"是否存在...`);
+  console.log(`正在检查KV namespace "${KV_NAMESPACE_NAME}"是否存在...`);
   const output = runWranglerCommand('kv namespace list');
   
   try {
@@ -30,16 +28,16 @@ function checkKvNamespaceExists() {
     const jsonMatch = output.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const namespaces = JSON.parse(jsonMatch[0]);
-      return namespaces.find(ns => ns.title === KV_EXISTING_NS_NAME);
+      return namespaces.find(ns => ns.title === KV_NAMESPACE_NAME);
     }
     
     // 如果没有匹配到JSON格式，就使用正则表达式查找namespace
-    const namespaceRegex = new RegExp(`"${KV_EXISTING_NS_NAME}"\\s*([a-zA-Z0-9-]+)`);
+    const namespaceRegex = new RegExp(`"${KV_NAMESPACE_NAME}"\\s*([a-zA-Z0-9-]+)`);
     const match = output.match(namespaceRegex);
     
     if (match) {
       return { 
-        title: KV_EXISTING_NS_NAME, 
+        title: KV_NAMESPACE_NAME, 
         id: match[1] 
       };
     }
