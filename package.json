@@ -1,0 +1,26 @@
+{
+	"name": "submgr",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"dev": "next dev --turbopack",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint",
+		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+	},
+	"dependencies": {
+		"next": "15.2.5",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20250416.0",
+		"@opennextjs/cloudflare": "~1.0.0-beta.0 || ^1.0.0",
+		"@tailwindcss/postcss": "^4",
+		"tailwindcss": "^4",
+		"wrangler": "^4.11.1"
+	}
+}
