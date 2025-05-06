@@ -1,0 +1,10 @@
+import Image from "next/image";
+import SublinkWorker from './components/SublinkWorker';
+
+export default function Home() {
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <SublinkWorker />
+    </main>
+  );
+}
