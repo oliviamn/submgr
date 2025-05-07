@@ -437,65 +437,67 @@ export default function SublinkWorker() {
             <div className="mt-4">
               <h3 className="text-md font-semibold mb-2">{t('addCustomRule')}</h3>
               {customRules.map((rule, idx) => (
-                <div key={idx} className="mb-6 p-4 border rounded-lg bg-gray-50 relative">
-                  <div className="mb-2 font-semibold">{t('customRuleOutboundName')}</div>
-                  <input
-                    className="form-control mb-4"
-                    placeholder={t('customRuleOutboundName')}
-                    value={rule.name}
-                    onChange={e => updateCustomRule(idx, 'name', e.target.value)}
-                    required
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div key={idx} className="mb-6 p-6 border rounded-xl bg-gray-50 relative">
+                  <div className="mb-4">
+                    <label className="block font-bold text-lg mb-1">{t('customRuleOutboundName')}*</label>
+                    <input
+                      className="w-full px-4 py-2 border rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-400"
+                      placeholder={t('customRuleOutboundName')}
+                      value={rule.name}
+                      onChange={e => updateCustomRule(idx, 'name', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleGeoSite')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleGeoSite')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleGeoSitePlaceholder')}
                         value={rule.site}
                         onChange={e => updateCustomRule(idx, 'site', e.target.value)}
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleGeoIP')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleGeoIP')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleGeoIPPlaceholder')}
                         value={rule.ip}
                         onChange={e => updateCustomRule(idx, 'ip', e.target.value)}
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleDomainSuffix')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleDomainSuffix')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleDomainSuffixPlaceholder')}
                         value={rule.domain_suffix}
                         onChange={e => updateCustomRule(idx, 'domain_suffix', e.target.value)}
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleDomainKeyword')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleDomainKeyword')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleDomainKeywordPlaceholder')}
                         value={rule.domain_keyword}
                         onChange={e => updateCustomRule(idx, 'domain_keyword', e.target.value)}
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleIPCIDR')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleIPCIDR')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleIPCIDRPlaceholder')}
                         value={rule.ip_cidr}
                         onChange={e => updateCustomRule(idx, 'ip_cidr', e.target.value)}
                       />
                     </div>
                     <div>
-                      <div className="mb-1 text-sm text-gray-700">{t('customRuleProtocol')}</div>
+                      <label className="block text-gray-700 font-medium mb-1">{t('customRuleProtocol')}</label>
                       <input
-                        className="form-control mb-2"
+                        className="w-full px-3 py-2 border rounded-lg"
                         placeholder={t('customRuleProtocolPlaceholder')}
                         value={rule.protocol}
                         onChange={e => updateCustomRule(idx, 'protocol', e.target.value)}
@@ -504,7 +506,7 @@ export default function SublinkWorker() {
                   </div>
                   <button
                     type="button"
-                    className="absolute top-2 right-2 text-red-500"
+                    className="absolute top-4 right-4 text-red-500 font-semibold"
                     onClick={() => removeCustomRule(idx)}
                   >
                     {t('removeCustomRule')}
