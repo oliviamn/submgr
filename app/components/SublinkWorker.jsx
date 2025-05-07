@@ -49,6 +49,7 @@ export default function SublinkWorker() {
   const [shortCodeInput, setShortCodeInput] = useState('');
   const [remarks, setRemarks] = useState('');
   const [configCreatedTime, setConfigCreatedTime] = useState('');
+  const [customRules, setCustomRules] = useState([]);
 
 
   useEffect(() => {
@@ -99,10 +100,10 @@ export default function SublinkWorker() {
       const baseConfig = {};
 
       const builders = {
-        xray: new SingboxConfigBuilder(inputValue, selectedRules, [], undefined, currentLang, userAgent),
-        singbox: new SingboxConfigBuilder(inputValue, selectedRules, [], undefined, currentLang, userAgent),
-        clash: new ClashConfigBuilder(inputValue, selectedRules, [], baseConfig, currentLang, userAgent),
-        surge: new SurgeConfigBuilder(inputValue, selectedRules, [], baseConfig, currentLang, userAgent)
+        xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
+        singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
+        clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent),
+        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent)
       };
 
       // Generate a single shortcode for all types
@@ -132,7 +133,8 @@ export default function SublinkWorker() {
             rules: {
               advancedOptions,
               selectedRules,
-              selectedRulePreset
+              selectedRulePreset,
+              customRules
             },
             remarks,
             configCreatedTime: new Date().toISOString()
@@ -239,10 +241,16 @@ export default function SublinkWorker() {
         setAdvancedOptions(config.rules.advancedOptions);
         setSelectedRules(config.rules.selectedRules);
         setSelectedRulePreset(config.rules.selectedRulePreset);
+        if (config.rules.customRules) {
+          setCustomRules(config.rules.customRules);
+        } else {
+          setCustomRules([]);
+        }
       } else {
         setSelectedRules([]);
         setSelectedRulePreset('custom');
         setAdvancedOptions(false);
+        setCustomRules([]);
       }
       // Set remarks and configCreatedTime if they exist
       if (config.remarks) {
@@ -274,6 +282,28 @@ export default function SublinkWorker() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const addCustomRule = () => {
+    setCustomRules([...customRules, {
+      name: '',
+      site: '',
+      ip: '',
+      domain_suffix: '',
+      domain_keyword: '',
+      ip_cidr: '',
+      protocol: ''
+    }]);
+  };
+
+  const removeCustomRule = (idx) => {
+    setCustomRules(customRules.filter((_, i) => i !== idx));
+  };
+
+  const updateCustomRule = (idx, field, value) => {
+    setCustomRules(customRules.map((rule, i) =>
+      i === idx ? { ...rule, [field]: value } : rule
+    ));
   };
 
   return (
@@ -403,6 +433,91 @@ export default function SublinkWorker() {
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-md font-semibold mb-2">{t('addCustomRule')}</h3>
+              {customRules.map((rule, idx) => (
+                <div key={idx} className="mb-6 p-4 border rounded-lg bg-gray-50 relative">
+                  <div className="mb-2 font-semibold">{t('customRuleOutboundName')}</div>
+                  <input
+                    className="form-control mb-4"
+                    placeholder={t('customRuleOutboundName')}
+                    value={rule.name}
+                    onChange={e => updateCustomRule(idx, 'name', e.target.value)}
+                    required
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleGeoSite')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleGeoSitePlaceholder')}
+                        value={rule.site}
+                        onChange={e => updateCustomRule(idx, 'site', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleGeoIP')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleGeoIPPlaceholder')}
+                        value={rule.ip}
+                        onChange={e => updateCustomRule(idx, 'ip', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleDomainSuffix')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleDomainSuffixPlaceholder')}
+                        value={rule.domain_suffix}
+                        onChange={e => updateCustomRule(idx, 'domain_suffix', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleDomainKeyword')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleDomainKeywordPlaceholder')}
+                        value={rule.domain_keyword}
+                        onChange={e => updateCustomRule(idx, 'domain_keyword', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleIPCIDR')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleIPCIDRPlaceholder')}
+                        value={rule.ip_cidr}
+                        onChange={e => updateCustomRule(idx, 'ip_cidr', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-sm text-gray-700">{t('customRuleProtocol')}</div>
+                      <input
+                        className="form-control mb-2"
+                        placeholder={t('customRuleProtocolPlaceholder')}
+                        value={rule.protocol}
+                        onChange={e => updateCustomRule(idx, 'protocol', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 text-red-500"
+                    onClick={() => removeCustomRule(idx)}
+                  >
+                    {t('removeCustomRule')}
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={addCustomRule}
+              >
+                {t('addCustomRule')}
+              </button>
             </div>
           </div>
         )}
