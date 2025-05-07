@@ -513,7 +513,7 @@ export default function SublinkWorker() {
               ))}
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="mt-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-400 text-white rounded-lg shadow hover:opacity-90 transition"
                 onClick={addCustomRule}
               >
                 {t('addCustomRule')}
