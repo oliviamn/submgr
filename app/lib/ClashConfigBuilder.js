@@ -5,13 +5,15 @@ import { DeepCopy } from './utils.js';
 import { t } from './i18n/index.js';
 
 export class ClashConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '') {
         if (!baseConfig) {
             baseConfig = CLASH_CONFIG;
         }
         super(inputString, baseConfig, lang, userAgent);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
+        this.proxyEnabled = proxyEnabled;
+        this.proxyUrl = proxyUrl;
     }
 
     getProxies() {
@@ -204,7 +206,7 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
         const ruleResults = [];
         
         // 获取.mrs规则集配置
-        const { site_rule_providers, ip_rule_providers } = generateClashRuleSets(this.selectedRules, this.customRules);
+        const { site_rule_providers, ip_rule_providers } = generateClashRuleSets(this.selectedRules, this.customRules, this.proxyEnabled, this.proxyUrl);
         
         // 添加规则集提供者
         this.config['rule-providers'] = {
