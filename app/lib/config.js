@@ -1,11 +1,33 @@
 import { t } from './i18n';
 
-export const SITE_RULE_SET_BASE_URL = 'https://gh.sageer.me/https://raw.githubusercontent.com/lyc8503/sing-box-rules/refs/heads/rule-set-geosite/';
-export const IP_RULE_SET_BASE_URL = 'https://gh.sageer.me/https://raw.githubusercontent.com/lyc8503/sing-box-rules/refs/heads/rule-set-geoip/';
-export const CLASH_SITE_RULE_SET_BASE_URL = 'https://gh.sageer.me/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/';
-export const CLASH_IP_RULE_SET_BASE_URL = 'https://gh.sageer.me/https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/';
-export const SURGE_SITE_RULE_SET_BASEURL = 'https://gh.sageer.me/https://github.com/NSZA156/surge-geox-rules/raw/refs/heads/release/geo/geosite/'
-export const SURGE_IP_RULE_SET_BASEURL = 'https://gh.sageer.me/https://github.com/NSZA156/surge-geox-rules/raw/refs/heads/release/geo/geoip/'
+// Get proxy URL from state
+const getProxyUrl = (proxyEnabled, proxyUrl) => {
+	return proxyEnabled && proxyUrl ? proxyUrl : '';
+};
+
+export const createBaseUrls = (proxyEnabled, proxyUrl) => {
+	const PROXY_URL = getProxyUrl(proxyEnabled, proxyUrl);
+	
+	return {
+		SITE_RULE_SET_BASE_URL: `${PROXY_URL}https://raw.githubusercontent.com/lyc8503/sing-box-rules/refs/heads/rule-set-geosite/`,
+		IP_RULE_SET_BASE_URL: `${PROXY_URL}https://raw.githubusercontent.com/lyc8503/sing-box-rules/refs/heads/rule-set-geoip/`,
+		CLASH_SITE_RULE_SET_BASE_URL: `${PROXY_URL}https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/`,
+		CLASH_IP_RULE_SET_BASE_URL: `${PROXY_URL}https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/`,
+		SURGE_SITE_RULE_SET_BASEURL: `${PROXY_URL}https://github.com/NSZA156/surge-geox-rules/raw/refs/heads/release/geo/geosite/`,
+		SURGE_IP_RULE_SET_BASEURL: `${PROXY_URL}https://github.com/NSZA156/surge-geox-rules/raw/refs/heads/release/geo/geoip/`
+	};
+};
+
+// Default URLs without proxy
+const defaultUrls = createBaseUrls(false, '');
+
+export const SITE_RULE_SET_BASE_URL = defaultUrls.SITE_RULE_SET_BASE_URL;
+export const IP_RULE_SET_BASE_URL = defaultUrls.IP_RULE_SET_BASE_URL;
+export const CLASH_SITE_RULE_SET_BASE_URL = defaultUrls.CLASH_SITE_RULE_SET_BASE_URL;
+export const CLASH_IP_RULE_SET_BASE_URL = defaultUrls.CLASH_IP_RULE_SET_BASE_URL;
+export const SURGE_SITE_RULE_SET_BASEURL = defaultUrls.SURGE_SITE_RULE_SET_BASEURL;
+export const SURGE_IP_RULE_SET_BASEURL = defaultUrls.SURGE_IP_RULE_SET_BASEURL;
+
 // Custom rules
 export const CUSTOM_RULES = [];
 // Unified rule structure

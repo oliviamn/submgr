@@ -3,7 +3,7 @@ import { SURGE_CONFIG, SURGE_SITE_RULE_SET_BASEURL, SURGE_IP_RULE_SET_BASEURL, g
 import { t } from './i18n/index.js';
 
 export class SurgeConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '') {
         // Not yet implemented, set aside for later use ;)
         // if (!baseConfig) {
         //     baseConfig = SURGE_CONFIG;
@@ -13,6 +13,8 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
         this.selectedRules = selectedRules;
         this.customRules = customRules;
         this.subscriptionUrl = null;
+        this.proxyEnabled = proxyEnabled;
+        this.proxyUrl = proxyUrl;
     }
 
     setSubscriptionUrl(url) {
@@ -239,15 +241,18 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
             });
         });
 
+        // Add proxy URL to rule set URLs if enabled
+        const proxyPrefix = this.proxyEnabled && this.proxyUrl ? this.proxyUrl : '';
+        
         rules.filter(rule => rule.site_rules[0] !== '').map(rule => {
             rule.site_rules.forEach(site => {
-                finalConfig.push(`RULE-SET,${SURGE_SITE_RULE_SET_BASEURL}${site}.conf,${t('outboundNames.'+ rule.outbound)}`);
+                finalConfig.push(`RULE-SET,${proxyPrefix}${SURGE_SITE_RULE_SET_BASEURL}${site}.conf,${t('outboundNames.'+ rule.outbound)}`);
             });
         });
 
         rules.filter(rule => rule.ip_rules[0] !== '').map(rule => {
             rule.ip_rules.forEach(ip => {
-                finalConfig.push(`RULE-SET,${SURGE_IP_RULE_SET_BASEURL}${ip}.txt,${t('outboundNames.'+ rule.outbound)},no-resolve`);
+                finalConfig.push(`RULE-SET,${proxyPrefix}${SURGE_IP_RULE_SET_BASEURL}${ip}.txt,${t('outboundNames.'+ rule.outbound)},no-resolve`);
             });
         });
 

@@ -50,7 +50,8 @@ export default function SublinkWorker() {
   const [remarks, setRemarks] = useState('');
   const [configCreatedTime, setConfigCreatedTime] = useState('');
   const [customRules, setCustomRules] = useState([]);
-
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxyUrl, setProxyUrl] = useState('');
 
   useEffect(() => {
     // Initialize with Chinese by default
@@ -103,7 +104,7 @@ export default function SublinkWorker() {
         xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
         singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
         clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent),
-        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent)
+        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl)
       };
 
       // Generate a single shortcode for all types
@@ -134,7 +135,9 @@ export default function SublinkWorker() {
               advancedOptions,
               selectedRules,
               selectedRulePreset,
-              customRules
+              customRules,
+              proxyEnabled,
+              proxyUrl
             },
             remarks,
             configCreatedTime: new Date().toISOString()
@@ -246,11 +249,20 @@ export default function SublinkWorker() {
         } else {
           setCustomRules([]);
         }
+        // Load proxy settings
+        if (config.rules.proxyEnabled !== undefined) {
+          setProxyEnabled(config.rules.proxyEnabled);
+        }
+        if (config.rules.proxyUrl) {
+          setProxyUrl(config.rules.proxyUrl);
+        }
       } else {
         setSelectedRules([]);
         setSelectedRulePreset('custom');
         setAdvancedOptions(false);
         setCustomRules([]);
+        setProxyEnabled(false);
+        setProxyUrl('');
       }
       // Set remarks and configCreatedTime if they exist
       if (config.remarks) {
@@ -434,6 +446,48 @@ export default function SublinkWorker() {
                 ))}
               </div>
             </div>
+
+            {/* Proxy Settings */}
+            <div className="form-section mt-6">
+              <div className="form-section-title">
+                <h3 className="text-md font-semibold mb-2">Proxy Settings</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="proxyEnabled"
+                    checked={proxyEnabled}
+                    onChange={(e) => setProxyEnabled(e.target.checked)}
+                    className="h-4 w-4 text-purple-600 rounded"
+                  />
+                  <label htmlFor="proxyEnabled" className="text-sm font-medium">
+                    Enable Proxy
+                  </label>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="proxyUrl" className="block text-sm font-medium">
+                    Proxy URL
+                  </label>
+                  <input
+                    type="text"
+                    id="proxyUrl"
+                    value={proxyUrl}
+                    onChange={(e) => setProxyUrl(e.target.value)}
+                    placeholder="https://your-proxy-url.com/"
+                    disabled={!proxyEnabled}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-sm text-gray-500">
+                    {proxyEnabled
+                      ? 'Enter the proxy URL to use for rule set downloads'
+                      : 'Enable proxy to configure the URL'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-4">
               <h3 className="text-md font-semibold mb-2">{t('addCustomRule')}</h3>
               {customRules.map((rule, idx) => (
