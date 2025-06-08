@@ -4,7 +4,7 @@ import { DeepCopy } from './utils.js';
 import { t } from './i18n/index.js';
 
 export class SingboxConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '') {
         if (baseConfig === undefined) {
             baseConfig = SING_BOX_CONFIG;
             if (baseConfig.dns && baseConfig.dns.servers) {
@@ -14,6 +14,8 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         super(inputString, baseConfig, lang, userAgent);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
+        this.proxyEnabled = proxyEnabled;
+        this.proxyUrl = proxyUrl;
     }
 
     getProxies() {
@@ -100,7 +102,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
 
     formatConfig() {
         const rules = generateRules(this.selectedRules, this.customRules);
-        const { site_rule_sets, ip_rule_sets } = generateRuleSets(this.selectedRules,this.customRules);
+        const { site_rule_sets, ip_rule_sets } = generateRuleSets(this.selectedRules, this.customRules, this.proxyEnabled, this.proxyUrl);
 
         this.config.route.rule_set = [...site_rule_sets, ...ip_rule_sets];
 

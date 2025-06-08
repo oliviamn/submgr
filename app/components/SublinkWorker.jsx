@@ -101,9 +101,9 @@ export default function SublinkWorker() {
       const baseConfig = {};
 
       const builders = {
-        xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
-        singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
-        clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent),
+        xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl),
+        singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl),
+        clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl),
         surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl)
       };
 
