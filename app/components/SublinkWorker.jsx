@@ -104,7 +104,7 @@ export default function SublinkWorker() {
         xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
         singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent),
         clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent),
-        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent)
+        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl)
       };
 
       // Generate a single shortcode for all types
