@@ -53,6 +53,31 @@ export default function SublinkWorker() {
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState('');
 
+  // Auto-decode base64 if the input looks like base64
+  const handleInputChange = (value) => {
+    // Check if input looks like base64 (long string with only base64 chars, no newlines, no ://)
+    const isBase64Like = value.length > 50 && 
+                         /^[A-Za-z0-9+/=_-]+$/.test(value.trim()) &&
+                         !value.includes('://') &&
+                         !value.includes('\n');
+    
+    if (isBase64Like) {
+      try {
+        // Try to decode
+        const decoded = atob(value.trim());
+        // If decoded content looks like proxy URLs, use it
+        if (decoded.includes('://') || decoded.includes('vmess://') || decoded.includes('ss://')) {
+          console.log('[SublinkWorker] Auto-decoded base64 input');
+          setInputValue(decoded);
+          return;
+        }
+      } catch (e) {
+        // Not valid base64, use as-is
+      }
+    }
+    setInputValue(value);
+  };
+
   useEffect(() => {
     // Initialize with Chinese by default
     setLanguage('zh-CN');
@@ -179,7 +204,12 @@ export default function SublinkWorker() {
         setShortCodeInput(shortCode);
       }
     } catch (err) {
-      setError(err.message);
+      // Handle structured error objects from API
+      if (err.details && typeof err.details === 'object') {
+        setError(err.details);
+      } else {
+        setError(err.message || 'Conversion failed');
+      }
       console.error('Conversion error:', err);
     } finally {
       setIsConverting(false);
@@ -208,7 +238,7 @@ export default function SublinkWorker() {
 
   // Add new function to load config
   const handleLoadConfig = async () => {
-    console.log('Entered Loading config for shortcode:', shortCodeInput);
+    console.log('Loading config for shortcode:', shortCodeInput);
     if (!shortCodeInput) {
       setError('Please enter a short code');
       return;
@@ -232,29 +262,45 @@ export default function SublinkWorker() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load configuration');
+        let errorMsg = `Failed to load configuration (HTTP ${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorData.details || errorMsg;
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+        throw new Error(errorMsg);
       }
 
       const config = await response.json();
-      if (config.type == 'raw') {
-        console.log('Loaded config:', config);
+      console.log('Loaded config:', config);
+      
+      if (!config || typeof config !== 'object') {
+        throw new Error('Invalid configuration format');
       }
-      setInputValue(config.inputValue);
-      if (config.rules && config.rules.advancedOptions) {
-        setAdvancedOptions(config.rules.advancedOptions);
-        setSelectedRules(config.rules.selectedRules);
-        setSelectedRulePreset(config.rules.selectedRulePreset);
-        if (config.rules.customRules) {
-          setCustomRules(config.rules.customRules);
+      
+      // Support both old format (direct) and new format (nested in config property)
+      const configData = config.config || config;
+      
+      setInputValue(configData.inputValue || '');
+      setRemarks(configData.remarks || '');
+      setConfigCreatedTime(configData.configCreatedTime || '');
+      
+      if (configData.rules && configData.rules.advancedOptions) {
+        setAdvancedOptions(configData.rules.advancedOptions);
+        setSelectedRules(configData.rules.selectedRules);
+        setSelectedRulePreset(configData.rules.selectedRulePreset);
+        if (configData.rules.customRules) {
+          setCustomRules(configData.rules.customRules);
         } else {
           setCustomRules([]);
         }
         // Load proxy settings
-        if (config.rules.proxyEnabled !== undefined) {
-          setProxyEnabled(config.rules.proxyEnabled);
+        if (configData.rules.proxyEnabled !== undefined) {
+          setProxyEnabled(configData.rules.proxyEnabled);
         }
-        if (config.rules.proxyUrl) {
-          setProxyUrl(config.rules.proxyUrl);
+        if (configData.rules.proxyUrl) {
+          setProxyUrl(configData.rules.proxyUrl);
         }
       } else {
         setSelectedRules([]);
@@ -263,13 +309,6 @@ export default function SublinkWorker() {
         setCustomRules([]);
         setProxyEnabled(false);
         setProxyUrl('');
-      }
-      // Set remarks and configCreatedTime if they exist
-      if (config.remarks) {
-        setRemarks(config.remarks);
-      }
-      if (config.configCreatedTime) {
-        setConfigCreatedTime(config.configCreatedTime);
       }
 
       // Set the short links for the loaded config
@@ -364,8 +403,19 @@ export default function SublinkWorker() {
             className="w-full h-32 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
             placeholder={t('urlPlaceholder')}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
           />
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>💡 Cloudflare blocking subscriptions?</strong> Paste the content directly:
+            </p>
+            <ol className="mt-2 text-sm text-blue-700 list-decimal list-inside space-y-1">
+              <li>Get the content: <code className="bg-blue-100 px-1 rounded">curl -L -H &quot;User-Agent: Mozilla/5.0&quot; YOUR_URL | base64 -d</code></li>
+              <li>Or open the URL in browser, copy the base64 string</li>
+              <li>Paste the <strong>base64 string</strong> or <strong>decoded nodes</strong> (vmess://, ss://, etc.) above</li>
+              <li><strong>Tip:</strong> The app will auto-decode base64 for you!</li>
+            </ol>
+          </div>
         </div>
 
         {/* Remarks Input */}
@@ -611,8 +661,18 @@ export default function SublinkWorker() {
 
         {/* Error Message */}
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg">
-            {error}
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 font-medium">{typeof error === 'string' ? error : error.message || 'An error occurred'}</p>
+            {error.steps && (
+              <div className="mt-3">
+                <p className="text-red-700 font-medium">{error.solution}:</p>
+                <ol className="mt-2 text-red-600 list-decimal list-inside space-y-1">
+                  {error.steps.map((step, idx) => (
+                    <li key={idx}>{step}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
         )}
 

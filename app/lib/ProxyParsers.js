@@ -266,16 +266,35 @@ export class ProxyParser {
                   "User-Agent"   : userAgent
                 });
                 const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}&ua=${encodeURIComponent(userAgent)}`;
-                console.log("proxyUrl", proxyUrl);
+                console.log("[HttpParser] Fetching via proxy:", proxyUrl);
                 const response = await fetch(proxyUrl)
-                // const response = await fetch(url, {
-                //   method : 'GET',
-                //   headers : headers
-                // });
+                
+                console.log("[HttpParser] Response status:", response.status);
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    let errorBody = '';
+                    let errorObj = null;
+                    try {
+                        errorBody = await response.text();
+                        // Try to parse as JSON for structured errors
+                        errorObj = JSON.parse(errorBody);
+                    } catch (e) {
+                        // Not JSON, use text
+                    }
+                    console.error(`[HttpParser] Proxy error: ${response.status}`, errorBody.substring(0, 200));
+                    
+                    // Create error with details
+                    const error = new Error(errorObj?.error || `Proxy HTTP error! status: ${response.status}`);
+                    if (errorObj) {
+                        error.details = errorObj;
+                    }
+                    throw error;
                 }
+                
                 const text = await response.text();
+                console.log(`[HttpParser] Received ${text.length} bytes`);
+                console.log("[HttpParser] First 200 chars:", text.substring(0, 200));
+                
                 let decodedText;
                 try {
                     decodedText = decodeBase64(text.trim());
@@ -294,10 +313,13 @@ export class ProxyParser {
                         }
                     }
                 }
-                return decodedText.split('\n').filter(line => line.trim() !== '');
+                const lines = decodedText.split('\n').filter(line => line.trim() !== '');
+                console.log(`[HttpParser] Parsed ${lines.length} proxy lines`);
+                return lines;
             } catch (error) {
-                console.error('Error fetching or parsing HTTP(S) content:', error);
-                return null;
+                console.error('[HttpParser] Error fetching or parsing HTTP(S) content:', error);
+                // Return empty array instead of null to prevent downstream errors
+                return [];
             }
         }
     }
