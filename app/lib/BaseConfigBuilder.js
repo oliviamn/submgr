@@ -9,12 +9,38 @@ export class BaseConfigBuilder {
         this.config = DeepCopy(baseConfig);
         this.customRules = [];
         this.selectedRules = [];
+        this.failedSubscriptions = [];
         setLanguage(lang);
         this.userAgent = userAgent;
     }
 
     async build() {
         const customItems = await this.parseCustomItems();
+        
+        // Check if we got any proxies
+        const currentProxies = this.getProxies();
+        if (customItems.length === 0 && currentProxies.length === 0) {
+            // Check if we have detailed error info from a failed subscription
+            const firstFailed = this.failedSubscriptions?.[0];
+            if (firstFailed?.error?.steps) {
+                // Propagate the structured error from the API
+                const error = new Error(firstFailed.error.error || 'Failed to fetch subscription');
+                error.details = firstFailed.error;
+                throw error;
+            }
+            
+            const error = new Error(
+                this.failedSubscriptions?.length > 0
+                    ? `Failed to fetch subscription(s). The provider may be blocking Cloudflare IPs. Try:
+1. Using a different network to access the subscription
+2. Pasting the proxy nodes directly instead of the subscription URL
+3. Contact your subscription provider about Cloudflare bot protection`
+                    : 'No valid proxy configurations found. Please check your input.'
+            );
+            error.failedSubscriptions = this.failedSubscriptions;
+            throw error;
+        }
+        
         this.addCustomItems(customItems);
         this.addSelectors();
         return this.formatConfig();
@@ -23,6 +49,7 @@ export class BaseConfigBuilder {
     async parseCustomItems() {
         const urls = this.inputString.split('\n').filter(url => url.trim() !== '');
         const parsedItems = [];
+        const failedUrls = [];
 
         for (const url of urls) {
             // Try to decode if it might be base64
@@ -46,18 +73,41 @@ export class BaseConfigBuilder {
                 }
             } else {
                 // Handle single URL (original behavior)
-                const result = await ProxyParser.parse(processedUrls, this.userAgent);
-                if (Array.isArray(result)) {
-                    for (const subUrl of result) {
-                        const subResult = await ProxyParser.parse(subUrl, this.userAgent);
-                        if (subResult) {
-                            parsedItems.push(subResult);
+                try {
+                    const result = await ProxyParser.parse(processedUrls, this.userAgent);
+                    if (Array.isArray(result)) {
+                        if (result.length === 0 && (processedUrls.startsWith('http://') || processedUrls.startsWith('https://'))) {
+                            console.warn(`[BaseConfigBuilder] Empty result from subscription URL: ${processedUrls}`);
+                            failedUrls.push({ url: processedUrls, error: 'Empty response' });
+                        }
+                        for (const subUrl of result) {
+                            const subResult = await ProxyParser.parse(subUrl, this.userAgent);
+                            if (subResult) {
+                                parsedItems.push(subResult);
+                            }
+                        }
+                    } else if (result) {
+                        parsedItems.push(result);
+                    } else {
+                        // If result is null/undefined and it's a URL, mark as failed
+                        if (processedUrls.startsWith('http://') || processedUrls.startsWith('https://')) {
+                            failedUrls.push({ url: processedUrls, error: 'No result' });
                         }
                     }
-                } else if (result) {
-                    parsedItems.push(result);
+                } catch (error) {
+                    console.error(`[BaseConfigBuilder] Error parsing ${processedUrls}:`, error);
+                    if (processedUrls.startsWith('http://') || processedUrls.startsWith('https://')) {
+                        failedUrls.push({ url: processedUrls, error: error.details || error.message });
+                    }
                 }
             }
+        }
+
+        // If we have failed URLs, log them but don't throw - 
+        // let the caller decide if this is fatal (based on whether we got any proxies)
+        if (failedUrls.length > 0) {
+            console.warn(`[BaseConfigBuilder] Failed to fetch from ${failedUrls.length} subscription(s):`, failedUrls);
+            this.failedSubscriptions = failedUrls;
         }
 
         return parsedItems;

@@ -30,32 +30,37 @@ export async function GET(
 ) {
   try {
     const { type, shortcode } = await params;
+    console.log('[API] GET request:', { type, shortcode });
+    
     const { env } = getCloudflareContext();
-
+    
+    if (!env || !env.SUBMGR_KV) {
+      console.error('[API] KV binding not available');
+      return NextResponse.json(
+        { error: 'KV storage not configured' },
+        { status: 500, headers: corsHeaders }
+      );
+    }
 
     // Validate type
     if (!VALID_TYPES.includes(type)) {
+      console.log('[API] Invalid type:', type);
       return NextResponse.json(
         { error: 'Invalid client type' },
-        { 
-          status: 400,
-          headers: corsHeaders
-        }
+        { status: 400, headers: corsHeaders }
       );
     }
 
     // Get the config from Cloudflare KV
     const configId = `${type}_${shortcode}`;
-    console.log('Retrieving config:', { type, configId });
+    console.log('[API] Retrieving config:', configId);
     const config = await env.SUBMGR_KV.get(configId);
-    console.log('Retrieved config:', { config });
+    console.log('[API] Config found:', !!config, 'Length:', config?.length);
+    
     if (!config) {
       return NextResponse.json(
-        { error: 'Configuration not found' },
-        { 
-          status: 404,
-          headers: corsHeaders
-        }
+        { error: `Configuration not found for ID: ${configId}` },
+        { status: 404, headers: corsHeaders }
       );
     }
 
