@@ -71,7 +71,7 @@ export const UNIFIED_RULES = [
 	{
 		name: 'Location:CN',
 		outbound: t('outboundNames.Location:CN'),
-		site_rules: ['geolocation-cn'],
+		site_rules: ['geolocation-cn', 'jd'],
 		ip_rules: ['cn']
 	},
 	{
