@@ -105,9 +105,15 @@ export const UNIFIED_RULES = [
 		ip_rules: []
 	},
 	{
+		name: 'AWS Services',
+		outbound: t('outboundNames.AWS Services'),
+		site_rules: ['aws'],
+		ip_rules: []
+	},
+	{
 		name: 'Streaming',
 		outbound: t('outboundNames.Streaming'),
-		site_rules: ['netflix', 'hulu', 'disney', 'hbo', 'amazon','bahamut'],
+		site_rules: ['netflix', 'hulu', 'disney', 'hbo', 'amazon', 'bahamut', 'primevideo'],
 		ip_rules: []
 	},
 	{

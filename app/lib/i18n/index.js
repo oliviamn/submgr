@@ -77,6 +77,7 @@ const translations = {
       'Education': '📚 教育资源',
       'Financial': '💰 金融服务',
       'Cloud Services': '☁️ 云服务',
+      'AWS Services': '☁️ AWS服务',
       'Non-China': '🌐 非中国',
       'GLOBAL': 'GLOBAL'
     },
@@ -178,6 +179,7 @@ const translations = {
       'Education': '📚 Education Resources',
       'Financial': '💰 Financial Services',
       'Cloud Services': '☁️ Cloud Services',
+      'AWS Services': '☁️ AWS Services',
       'Non-China': '🌐 Non-China',
       'GLOBAL': 'GLOBAL'
     },

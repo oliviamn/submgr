@@ -27,6 +27,7 @@ const AVAILABLE_RULES = [
   'Github',
   'Microsoft',
   'Apple',
+  'AWS Services',
   'Social Media',
   'Streaming',
   'Gaming',
