@@ -4,7 +4,7 @@ import { t, setLanguage } from './i18n/index.js';
 import { generateRules, getOutbounds, PREDEFINED_RULE_SETS } from './config.js';
 
 export class BaseConfigBuilder {
-    constructor(inputString, baseConfig, lang, userAgent) {
+    constructor(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies = []) {
         this.inputString = inputString;
         this.config = DeepCopy(baseConfig);
         this.customRules = [];
@@ -12,14 +12,19 @@ export class BaseConfigBuilder {
         this.failedSubscriptions = [];
         setLanguage(lang);
         this.userAgent = userAgent;
+        // New: Accept pre-fetched subscription proxies
+        this.cachedSubscriptionProxies = cachedSubscriptionProxies || [];
     }
 
     async build() {
         const customItems = await this.parseCustomItems();
         
+        // Combine cached subscription proxies with custom items
+        const allProxies = [...this.cachedSubscriptionProxies, ...customItems];
+        
         // Check if we got any proxies
         const currentProxies = this.getProxies();
-        if (customItems.length === 0 && currentProxies.length === 0) {
+        if (allProxies.length === 0 && currentProxies.length === 0) {
             // Check if we have detailed error info from a failed subscription
             const firstFailed = this.failedSubscriptions?.[0];
             if (firstFailed?.error?.steps) {
@@ -41,12 +46,17 @@ export class BaseConfigBuilder {
             throw error;
         }
         
-        this.addCustomItems(customItems);
+        this.addCustomItems(allProxies);
         this.addSelectors();
         return this.formatConfig();
     }
 
     async parseCustomItems() {
+        // If inputString is empty, return empty array
+        if (!this.inputString || this.inputString.trim() === '') {
+            return [];
+        }
+
         const urls = this.inputString.split('\n').filter(url => url.trim() !== '');
         const parsedItems = [];
         const failedUrls = [];
