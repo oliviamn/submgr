@@ -5,6 +5,7 @@ import { t, setLanguage, getCurrentLang } from '../lib/i18n';
 import { SingboxConfigBuilder } from '../lib/SingboxConfigBuilder';
 import { ClashConfigBuilder } from '../lib/ClashConfigBuilder';
 import { SurgeConfigBuilder } from '../lib/SurgeConfigBuilder';
+import SubscriptionManager from './SubscriptionManager';
 
 // Define the rule presets
 const PREDEFINED_RULE_SETS = {
@@ -36,7 +37,8 @@ const AVAILABLE_RULES = [
 ];
 
 export default function SublinkWorker() {
-  const [inputValue, setInputValue] = useState('');
+  // State for standalone proxies (formerly inputValue)
+  const [standaloneProxies, setStandaloneProxies] = useState('');
   const [advancedOptions, setAdvancedOptions] = useState(false);
   const [selectedRulePreset, setSelectedRulePreset] = useState('custom');
   const [selectedRules, setSelectedRules] = useState([]);
@@ -52,9 +54,12 @@ export default function SublinkWorker() {
   const [customRules, setCustomRules] = useState([]);
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState('');
+  
+  // New: Subscription management state
+  const [subscriptions, setSubscriptions] = useState([]);
 
   // Auto-decode base64 if the input looks like base64
-  const handleInputChange = (value) => {
+  const handleStandaloneProxiesChange = (value) => {
     // Check if input looks like base64 (long string with only base64 chars, no newlines, no ://)
     const isBase64Like = value.length > 50 && 
                          /^[A-Za-z0-9+/=_-]+$/.test(value.trim()) &&
@@ -68,14 +73,14 @@ export default function SublinkWorker() {
         // If decoded content looks like proxy URLs, use it
         if (decoded.includes('://') || decoded.includes('vmess://') || decoded.includes('ss://')) {
           console.log('[SublinkWorker] Auto-decoded base64 input');
-          setInputValue(decoded);
+          setStandaloneProxies(decoded);
           return;
         }
       } catch (e) {
         // Not valid base64, use as-is
       }
     }
-    setInputValue(value);
+    setStandaloneProxies(value);
   };
 
   useEffect(() => {
@@ -116,20 +121,44 @@ export default function SublinkWorker() {
     });
   };
 
+  // Helper to get enabled subscription proxies
+  const getEnabledSubscriptionProxies = () => {
+    const enabledProxies = [];
+    for (const sub of subscriptions) {
+      if (sub.enabled && sub.proxies) {
+        enabledProxies.push(...sub.proxies);
+      }
+    }
+    return enabledProxies;
+  };
+
   const handleConvert = async () => {
     try {
       setIsConverting(true);
       setError(null);
 
-      // Create config builders
+      // Get enabled subscription proxies
+      const enabledSubProxies = getEnabledSubscriptionProxies();
+      
+      // Check if we have any proxies to work with
+      const hasStandaloneProxies = standaloneProxies.trim().length > 0;
+      const hasSubscriptionProxies = enabledSubProxies.length > 0;
+      
+      if (!hasStandaloneProxies && !hasSubscriptionProxies) {
+        setError('Please add at least one subscription or standalone proxy');
+        setIsConverting(false);
+        return;
+      }
+
+      // Create config builders with cached subscription proxies
       const userAgent = 'curl/7.74.0';
       const baseConfig = {};
 
       const builders = {
-        xray: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl),
-        singbox: new SingboxConfigBuilder(inputValue, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl),
-        clash: new ClashConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl),
-        surge: new SurgeConfigBuilder(inputValue, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl)
+        xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
+        singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
+        clash: new ClashConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
+        surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies)
       };
 
       // Generate a single shortcode for all types
@@ -147,7 +176,13 @@ export default function SublinkWorker() {
       const configs = {};
       const newShortLinks = {};
 
-      const response = await fetch('/api/config', {
+      // Get subscription IDs for storage
+      const subscriptionIds = subscriptions
+        .filter(s => s.enabled)
+        .map(s => s.subId);
+
+      // Save raw config with references
+      await fetch('/api/config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +190,6 @@ export default function SublinkWorker() {
         body: JSON.stringify({
           type: 'raw',
           config: {
-            inputValue,
             rules: {
               advancedOptions,
               selectedRules,
@@ -165,8 +199,11 @@ export default function SublinkWorker() {
               proxyUrl
             },
             remarks,
-            configCreatedTime: new Date().toISOString()
+            configCreatedTime: new Date().toISOString(),
+            version: '2.0'
           },
+          subscriptionIds,
+          standaloneProxies,
           shortCode,
         })
       });
@@ -177,7 +214,7 @@ export default function SublinkWorker() {
 
         // Save config to KV store
         try {
-          const response = await fetch('/api/config', {
+          await fetch('/api/config', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -185,10 +222,11 @@ export default function SublinkWorker() {
             body: JSON.stringify({
               type,
               config,
-              shortCode
+              shortCode,
+              subscriptionIds,
+              standaloneProxies
             })
           });
-          const configId = `${type}_${shortCode}`;
 
           newShortLinks[type] = `${window.location.origin}/api/${type}/${shortCode}`;
 
@@ -217,7 +255,7 @@ export default function SublinkWorker() {
   };
 
   const handleClear = () => {
-    setInputValue('');
+    setStandaloneProxies('');
     setSelectedRules([]);
     setSelectedRulePreset('custom');
     setConvertedConfigs(null);
@@ -226,6 +264,7 @@ export default function SublinkWorker() {
     setShortCodeInput('');
     setRemarks('');
     setConfigCreatedTime('');
+    setSubscriptions([]);
   };
 
   const copyToClipboard = async (text) => {
@@ -282,7 +321,32 @@ export default function SublinkWorker() {
       // Support both old format (direct) and new format (nested in config property)
       const configData = config.config || config;
       
-      setInputValue(configData.inputValue || '');
+      // Handle v2 format with subscriptionIds
+      if (config.version === '2.0' || configData.version === '2.0') {
+        // Load subscriptions
+        if (config.subscriptionIds || configData.subscriptionIds) {
+          const subIds = config.subscriptionIds || configData.subscriptionIds || [];
+          // Load subscription details
+          const subResponse = await fetch(`/api/subscription?shortCode=${shortCodeInput}`);
+          const subData = await subResponse.json();
+          if (subData.success) {
+            // Mark enabled subscriptions based on stored IDs
+            const loadedSubs = subData.subscriptions.map(s => ({
+              ...s,
+              enabled: subIds.includes(s.subId)
+            }));
+            setSubscriptions(loadedSubs);
+          }
+        }
+        
+        // Load standalone proxies
+        setStandaloneProxies(config.standaloneProxies || configData.standaloneProxies || '');
+      } else {
+        // Legacy format: inputValue contains everything
+        setStandaloneProxies(configData.inputValue || '');
+        setSubscriptions([]);
+      }
+      
       setRemarks(configData.remarks || '');
       setConfigCreatedTime(configData.configCreatedTime || '');
       
@@ -374,7 +438,7 @@ export default function SublinkWorker() {
         </select>
       </div>
 
-      {/* Load Config Section - Updated styling to match */}
+      {/* Load Config Section */}
       <div className="mb-6">
         <div className="flex gap-2">
           <input
@@ -395,31 +459,34 @@ export default function SublinkWorker() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white rounded-lg p-6 shadow-lg">
-        {/* Share Link Section */}
-        <div className="mb-6">
-          <h2 className="text-lg mb-2">{t('shareUrls')}</h2>
+      <div className="bg-white rounded-lg p-6 shadow-lg space-y-6">
+        
+        {/* Subscription Management Section */}
+        <SubscriptionManager
+          shortCode={shortCodeInput}
+          subscriptions={subscriptions}
+          onSubscriptionsChange={setSubscriptions}
+          userAgent="curl/7.74.0"
+        />
+
+        {/* Standalone Proxies Section */}
+        <div className="border-t pt-6">
+          <h2 className="text-lg mb-2 font-semibold">{t('standaloneProxies')}</h2>
           <textarea
             className="w-full h-32 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
-            placeholder={t('urlPlaceholder')}
-            value={inputValue}
-            onChange={(e) => handleInputChange(e.target.value)}
+            placeholder={t('standaloneProxiesPlaceholder')}
+            value={standaloneProxies}
+            onChange={(e) => handleStandaloneProxiesChange(e.target.value)}
           />
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>💡 Cloudflare blocking subscriptions?</strong> Paste the content directly:
+              <strong>💡 {t('standaloneProxiesTip')}</strong>
             </p>
-            <ol className="mt-2 text-sm text-blue-700 list-decimal list-inside space-y-1">
-              <li>Get the content: <code className="bg-blue-100 px-1 rounded">curl -L -H &quot;User-Agent: Mozilla/5.0&quot; YOUR_URL | base64 -d</code></li>
-              <li>Or open the URL in browser, copy the base64 string</li>
-              <li>Paste the <strong>base64 string</strong> or <strong>decoded nodes</strong> (vmess://, ss://, etc.) above</li>
-              <li><strong>Tip:</strong> The app will auto-decode base64 for you!</li>
-            </ol>
           </div>
         </div>
 
         {/* Remarks Input */}
-        <div className="mb-6">
+        <div>
           <h2 className="text-lg mb-2">{t('remarks')}</h2>
           <textarea
             className="w-full h-20 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -431,13 +498,13 @@ export default function SublinkWorker() {
 
         {/* Created Time Display */}
         {configCreatedTime && (
-          <div className="mb-6 text-sm text-gray-600">
+          <div className="text-sm text-gray-600">
             {t('createdTime')}: {new Date(configCreatedTime).toLocaleString(currentLang)}
           </div>
         )}
 
-        {/* Advanced Options */}
-        <div className="mb-6 flex items-center">
+        {/* Advanced Options Toggle */}
+        <div className="flex items-center">
           <div className="flex items-center">
             <div
               className={`w-12 h-6 rounded-full p-1 cursor-pointer ${advancedOptions ? 'bg-purple-600' : 'bg-gray-300'
@@ -455,7 +522,7 @@ export default function SublinkWorker() {
 
         {/* Advanced Options Content */}
         {advancedOptions && (
-          <div className="mb-6">
+          <div className="space-y-6">
             <div className="form-section">
               <div className="form-section-title d-flex align-items-center">
                 {t('ruleSelection')}
@@ -498,7 +565,7 @@ export default function SublinkWorker() {
             </div>
 
             {/* Proxy Settings */}
-            <div className="form-section mt-6">
+            <div className="form-section">
               <div className="form-section-title">
                 <h3 className="text-md font-semibold mb-2">Proxy Settings</h3>
               </div>
@@ -538,7 +605,8 @@ export default function SublinkWorker() {
               </div>
             </div>
 
-            <div className="mt-4">
+            {/* Custom Rules */}
+            <div>
               <h3 className="text-md font-semibold mb-2">{t('addCustomRule')}</h3>
               {customRules.map((rule, idx) => (
                 <div key={idx} className="mb-6 p-6 border rounded-xl bg-gray-50 relative">
@@ -629,12 +697,14 @@ export default function SublinkWorker() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 pt-4 border-t">
           <button
             onClick={handleConvert}
-            disabled={isConverting || !inputValue}
-            className={`flex-1 bg-gradient-to-r from-purple-600 to-blue-500 text-white py-3 px-6 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 ${(isConverting || !inputValue) ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+            disabled={isConverting || (subscriptions.filter(s => s.enabled).length === 0 && !standaloneProxies.trim())}
+            className={`flex-1 bg-gradient-to-r from-purple-600 to-blue-500 text-white py-3 px-6 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 ${
+              (isConverting || (subscriptions.filter(s => s.enabled).length === 0 && !standaloneProxies.trim())) 
+                ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             {isConverting ? (
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -717,4 +787,4 @@ export default function SublinkWorker() {
       </div>
     </div>
   );
-} 
+}

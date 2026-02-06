@@ -23,7 +23,7 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { type, config, shortCode } = await request.json();
+    const { type, config, shortCode, subscriptionIds, standaloneProxies } = await request.json();
     const { env } = getCloudflareContext();
 
     if (!type || !config || !shortCode) {
@@ -41,25 +41,32 @@ export async function POST(request) {
     try {
       // Convert config to appropriate format based on type
       let configContent;
-      switch (type) {
-        case 'raw':
-          configContent = JSON.stringify(config, null, 2);
-          break;
-        case 'surge':
-          // Surge config is already in text format
-          configContent = config;
-          break;
-        case 'clash':
-          // Clash config is in YAML format
-          configContent = config;
-          break;
-        case 'singbox':
-        case 'xray':
-          // Singbox and Xray configs are in JSON format
-          configContent = JSON.stringify(config, null, 2);
-          break;
-        default:
-          throw new Error(`Unsupported config type: ${type}`);
+      
+      if (type === 'raw') {
+        // For raw config, store metadata including subscription references
+        const rawConfig = {
+          ...config,
+          subscriptionIds: subscriptionIds || [],
+          standaloneProxies: standaloneProxies || '',
+          version: '2.0',
+        };
+        configContent = JSON.stringify(rawConfig, null, 2);
+      } else {
+        // For built configs (clash, surge, singbox, xray), store as-is
+        switch (type) {
+          case 'surge':
+            configContent = config;
+            break;
+          case 'clash':
+            configContent = config;
+            break;
+          case 'singbox':
+          case 'xray':
+            configContent = JSON.stringify(config, null, 2);
+            break;
+          default:
+            throw new Error(`Unsupported config type: ${type}`);
+        }
       }
       
       // Store in Cloudflare KV
