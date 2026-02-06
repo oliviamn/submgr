@@ -324,18 +324,32 @@ export default function SublinkWorker() {
       
       // Handle v2 format with subscriptionIds
       if (config.version === '2.0' || configData.version === '2.0') {
-        // Load subscriptions
+        // Load subscriptions with full proxy data
         if (config.subscriptionIds || configData.subscriptionIds) {
           const subIds = config.subscriptionIds || configData.subscriptionIds || [];
-          // Load subscription details
+          // Load subscription list first
           const subResponse = await fetch(`/api/subscription?shortCode=${shortCodeInput}`);
           const subData = await subResponse.json();
           if (subData.success) {
-            // Mark enabled subscriptions based on stored IDs
-            const loadedSubs = subData.subscriptions.map(s => ({
-              ...s,
-              enabled: subIds.includes(s.subId)
-            }));
+            // Fetch full subscription data (with proxies) for each subscription
+            const loadedSubs = await Promise.all(
+              (subData.subscriptions || []).map(async (s) => {
+                try {
+                  const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(s.subId)}`);
+                  if (fullSubResponse.ok) {
+                    const fullSubData = await fullSubResponse.json();
+                    return {
+                      ...s,
+                      proxies: fullSubData.proxies || [],
+                      enabled: subIds.includes(s.subId)
+                    };
+                  }
+                } catch (e) {
+                  console.warn('Failed to load full subscription:', s.subId);
+                }
+                return { ...s, proxies: [], enabled: subIds.includes(s.subId) };
+              })
+            );
             setSubscriptions(loadedSubs);
           }
         }
