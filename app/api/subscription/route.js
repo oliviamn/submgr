@@ -28,7 +28,7 @@ function hashUrl(url) {
 // POST - Fetch and cache a subscription
 export async function POST(request) {
   try {
-    const { url, shortCode, userAgent = 'curl/7.74.0' } = await request.json();
+    const { url, shortCode, userAgent = 'curl/7.74.0', proxyUrl } = await request.json();
     const { env } = getCloudflareContext();
 
     if (!url || !shortCode) {
@@ -51,7 +51,7 @@ export async function POST(request) {
     try {
       // Fetch subscription using the shared fetcher (with proxy support)
       console.log('[SubscriptionAPI] Fetching subscription:', url);
-      const text = await fetchSubscription(url, userAgent);
+      const text = await fetchSubscription(url, userAgent, proxyUrl);
       console.log(`[SubscriptionAPI] Received ${text.length} bytes`);
 
       // Decode base64 if needed
@@ -117,10 +117,10 @@ export async function POST(request) {
 
     } catch (fetchError) {
       console.error('[SubscriptionAPI] Fetch error:', fetchError);
-      
+
       // Return structured error for Cloudflare protection
       return NextResponse.json(
-        { 
+        {
           error: fetchError.message || 'Failed to fetch subscription',
           reason: 'Cloudflare bot protection blocks automated requests from datacenter IPs (including Cloudflare Workers).',
           solution: 'Paste the content directly',
@@ -160,7 +160,7 @@ export async function GET(request) {
     // List all keys with prefix
     const prefix = `sub_${shortCode}_`;
     const keys = await env.SUBMGR_KV.list({ prefix });
-    
+
     const subscriptions = [];
     for (const key of keys.keys) {
       try {
