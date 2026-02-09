@@ -1,10 +1,7 @@
-import Image from "next/image";
-import SublinkWorker from './components/SublinkWorker';
+import DashboardApp from './components/dashboard/DashboardApp';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-50">
-      <SublinkWorker />
-    </main>
+    <DashboardApp />
   );
 }

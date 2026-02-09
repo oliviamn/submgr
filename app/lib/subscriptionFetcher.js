@@ -8,14 +8,14 @@ async function fetchViaProxy(targetUrl, userAgent, proxyUrl) {
         console.log('[SubscriptionFetcher] No proxy URL configured, fetching directly');
         return null;
     }
-    
+
     // Construct proxy URL in path-style format
     const separator = proxyUrl.endsWith('/') ? '' : '/';
     const encodedTarget = encodeURIComponent(targetUrl);
     const proxiedUrl = `${proxyUrl}${separator}${encodedTarget}`;
-    
+
     console.log(`[SubscriptionFetcher] Fetching via external proxy`);
-    
+
     const response = await fetch(proxiedUrl, {
         method: 'GET',
         headers: {
@@ -23,21 +23,21 @@ async function fetchViaProxy(targetUrl, userAgent, proxyUrl) {
             'Accept': '*/*',
         },
     });
-    
+
     console.log(`[SubscriptionFetcher] External proxy response: ${response.status}`);
     return response;
 }
 
-export async function fetchSubscription(url, userAgent) {
-    const proxyUrl = process.env.PROXY_URL || DEFAULT_PROXY_URL;
+export async function fetchSubscription(url, userAgent, customProxyUrl) {
+    const proxyUrl = customProxyUrl !== undefined ? customProxyUrl : (process.env.PROXY_URL || DEFAULT_PROXY_URL);
     console.log(`[SubscriptionFetcher] Target URL: ${url}`);
     console.log(`[SubscriptionFetcher] PROXY_URL: ${proxyUrl}`);
-    
+
     const finalUserAgent = userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-    
+
     let response = null;
     let usedProxy = false;
-    
+
     // First, try fetching via external proxy if configured
     if (proxyUrl) {
         try {
@@ -55,7 +55,7 @@ export async function fetchSubscription(url, userAgent) {
             usedProxy = false;
         }
     }
-    
+
     // If proxy failed or not configured, try direct fetch
     if (!response || !response.ok) {
         console.log('[SubscriptionFetcher] Trying direct fetch...');
@@ -81,7 +81,7 @@ export async function fetchSubscription(url, userAgent) {
     if (!response.ok) {
         const errorText = await response.text().catch(() => 'No response body');
         console.error(`[SubscriptionFetcher] HTTP error! status: ${response.status}`);
-        
+
         const error = new Error(`HTTP error! status: ${response.status}`);
         error.status = response.status;
         error.responseText = errorText;
@@ -91,6 +91,6 @@ export async function fetchSubscription(url, userAgent) {
 
     const data = await response.text();
     console.log(`[SubscriptionFetcher] Successfully fetched ${data.length} bytes`);
-    
+
     return data;
 }
