@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { t, getCurrentLang } from '../lib/i18n';
 
 export default function SubscriptionManager({
-  shortCode,
   subscriptions,
   onSubscriptionsChange,
   onProviderRuleSetsChange,
@@ -19,25 +18,21 @@ export default function SubscriptionManager({
   const [fetchUserAgent, setFetchUserAgent] = useState(userAgent);
   const [showFetchSettings, setShowFetchSettings] = useState(false);
 
-  // Load cached subscriptions on mount or when shortCode changes
+  // Load globally managed subscriptions on mount
   useEffect(() => {
-    if (shortCode) {
-      loadCachedSubscriptions();
-    }
-  }, [shortCode]);
+    loadManagedSubscriptions();
+  }, []);
 
-  const loadCachedSubscriptions = async () => {
-    if (!shortCode) return;
-
+  const loadManagedSubscriptions = async () => {
     setLoadingSubs(true);
     try {
-      const response = await fetch(`/api/subscription?shortCode=${encodeURIComponent(shortCode)}`);
+      const response = await fetch('/api/subscription');
       const data = await response.json();
 
       if (data.success) {
-        // Fetch full subscription data (with proxies) for each subscription
         const fullSubscriptions = await Promise.all(
           (data.subscriptions || []).map(async (sub) => {
+            const existingSub = subscriptions.find(item => item.subId === sub.subId);
             try {
               const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(sub.subId)}`);
               if (fullSubResponse.ok) {
@@ -45,7 +40,7 @@ export default function SubscriptionManager({
                 return {
                   ...sub,
                   proxies: fullSubData.proxies || [],
-                  enabled: true,
+                  enabled: existingSub?.enabled || false,
                   providerRuleSetIds: fullSubData.providerRuleSetIds || [],
                   providerRuleSetNames: fullSubData.providerRuleSetNames || [],
                   providerRuleSetCount: fullSubData.providerRuleSetCount || 0,
@@ -55,7 +50,7 @@ export default function SubscriptionManager({
             } catch (e) {
               console.warn('Failed to load full subscription:', sub.subId);
             }
-            return { ...sub, proxies: [], enabled: true };
+            return { ...sub, proxies: [], enabled: existingSub?.enabled || false };
           })
         );
         onSubscriptionsChange(fullSubscriptions);
@@ -73,11 +68,6 @@ export default function SubscriptionManager({
       return;
     }
 
-    if (!shortCode) {
-      setError('Please generate or enter a short code first');
-      return;
-    }
-
     setIsFetching(true);
     setError(null);
 
@@ -87,7 +77,6 @@ export default function SubscriptionManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: newSubUrl.trim(),
-          shortCode,
           userAgent: fetchUserAgent,
           proxyUrl: fetchProxyUrl || undefined
         })
@@ -120,7 +109,10 @@ export default function SubscriptionManager({
         providerRuleSetNames: data.providerRuleSetNames || [],
       };
 
-      onSubscriptionsChange([...subscriptions, newSub]);
+      onSubscriptionsChange([
+        ...subscriptions.filter(sub => sub.subId !== newSub.subId),
+        newSub,
+      ]);
       await onProviderRuleSetsChange?.();
       setNewSubUrl('');
     } catch (err) {
@@ -187,7 +179,6 @@ export default function SubscriptionManager({
         throw new Error(data.error || 'Failed to delete subscription');
       }
 
-      // Remove from the list
       onSubscriptionsChange(subscriptions.filter(s => s.subId !== sub.subId));
     } catch (err) {
       setError(err.message);
@@ -292,7 +283,7 @@ export default function SubscriptionManager({
         </p>
       </div>
 
-      {/* Cached Subscriptions List */}
+      {/* Managed Subscriptions List */}
       {subscriptions.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-700">{t('cachedSubscriptions')}:</h4>

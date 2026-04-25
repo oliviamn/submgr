@@ -42,15 +42,31 @@ export default function Overview() {
             if (config.version === '2.0' || configData.version === '2.0') {
                 if (config.subscriptionIds || configData.subscriptionIds) {
                     const subIds = config.subscriptionIds || configData.subscriptionIds || [];
-
-                    const subResponse = await fetch(`/api/subscription?shortCode=${shortCodeInput}`);
+                    const subResponse = await fetch(`/api/subscription?ids=${encodeURIComponent(subIds.join(','))}`);
                     const subData = await subResponse.json();
 
                     if (subData.success) {
                         const loadedSubs = await Promise.all(
                             (subData.subscriptions || []).map(async (s) => {
-                                // In a real implementation we would fetch details here if needed
-                                return { ...s, enabled: subIds.includes(s.subId) };
+                                try {
+                                    const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(s.subId)}`);
+                                    if (fullSubResponse.ok) {
+                                        const fullSubData = await fullSubResponse.json();
+                                        return {
+                                            ...s,
+                                            proxies: fullSubData.proxies || [],
+                                            enabled: subIds.includes(s.subId),
+                                            providerRuleSetIds: fullSubData.providerRuleSetIds || [],
+                                            providerRuleSetNames: fullSubData.providerRuleSetNames || [],
+                                            providerRuleSetCount: fullSubData.providerRuleSetCount || 0,
+                                            providerName: fullSubData.providerName,
+                                        };
+                                    }
+                                } catch (error) {
+                                    console.warn('Failed to load full subscription:', s.subId);
+                                }
+
+                                return { ...s, proxies: [], enabled: subIds.includes(s.subId) };
                             })
                         );
                         setSubscriptions(loadedSubs);
@@ -111,8 +127,8 @@ export default function Overview() {
                         </div>
                         <span className="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Active</span>
                     </div>
-                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{subscriptions.length}</h3>
-                    <p className="text-gray-500 font-medium">Subscriptions</p>
+                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{subscriptions.filter(sub => sub.enabled).length}</h3>
+                    <p className="text-gray-500 font-medium">Selected Subscriptions</p>
                 </div>
 
                 <div

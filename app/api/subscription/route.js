@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { fetchSubscription } from '../../lib/subscriptionFetcher.js';
 import { deriveProviderName, extractAndStoreProviderRuleSets, parseSubscriptionProxies } from '../../lib/subscriptionProcessing.js';
+import { createManagedSubscriptionId, deleteManagedSubscription, listManagedSubscriptions, saveManagedSubscription } from '../../lib/subscriptionStore.js';
 
 // CORS headers
 const corsHeaders = {
@@ -14,26 +15,15 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// Hash URL for identification
-function hashUrl(url) {
-  let hash = 0;
-  for (let i = 0; i < url.length; i++) {
-    const char = url.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(36).substring(0, 8);
-}
-
-// POST - Fetch and cache a subscription
+// POST - Fetch and cache a globally managed subscription
 export async function POST(request) {
   try {
-    const { url, shortCode, userAgent = 'curl/7.74.0', proxyUrl } = await request.json();
+    const { url, userAgent = 'curl/7.74.0', proxyUrl } = await request.json();
     const { env } = getCloudflareContext();
 
-    if (!url || !shortCode) {
+    if (!url) {
       return NextResponse.json(
-        { error: 'Missing required fields: url and shortCode' },
+        { error: 'Missing required field: url' },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -45,8 +35,6 @@ export async function POST(request) {
         { status: 400, headers: corsHeaders }
       );
     }
-
-    const subId = `sub_${shortCode}_${hashUrl(url)}`;
 
     try {
       // Fetch subscription using the shared fetcher (with proxy support)
@@ -63,6 +51,8 @@ export async function POST(request) {
       }
 
       // Cache to KV
+      const subId = createManagedSubscriptionId({ url, userAgent, proxyUrl });
+
       const extractedRuleResult = await extractAndStoreProviderRuleSets({
         env,
         url,
@@ -72,11 +62,11 @@ export async function POST(request) {
 
       const extractedRuleSets = extractedRuleResult.extractedRuleSets || [];
       const cacheData = {
+        subId,
         url,
         proxies,
         fetchedAt: new Date().toISOString(),
         proxyCount: proxies.length,
-        shortCode,
         userAgent,
         proxyUrl,
         providerName: deriveProviderName(url),
@@ -85,7 +75,7 @@ export async function POST(request) {
         providerRuleSetCount: extractedRuleSets.length,
       };
 
-      await env.SUBMGR_KV.put(subId, JSON.stringify(cacheData));
+      await saveManagedSubscription(env, cacheData);
       console.log('[SubscriptionAPI] Cached subscription:', subId, 'with', proxies.length, 'proxies');
 
       return NextResponse.json({
@@ -128,46 +118,27 @@ export async function POST(request) {
   }
 }
 
-// GET - List cached subscriptions for a shortcode
+// GET - List globally managed subscriptions, or resolve a specific set of ids
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const shortCode = searchParams.get('shortCode');
+    const ids = searchParams.get('ids');
     const { env } = getCloudflareContext();
-
-    if (!shortCode) {
-      return NextResponse.json(
-        { error: 'Missing shortCode parameter' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // List all keys with prefix
-    const prefix = `sub_${shortCode}_`;
-    const keys = await env.SUBMGR_KV.list({ prefix });
-
-    const subscriptions = [];
-    for (const key of keys.keys) {
-      try {
-        const data = await env.SUBMGR_KV.get(key.name);
-        if (data) {
-          const parsed = JSON.parse(data);
-            subscriptions.push({
-              subId: key.name,
-              url: parsed.url,
-              proxyCount: parsed.proxyCount,
-              fetchedAt: parsed.fetchedAt,
-              name: parsed.name || `Subscription (${parsed.proxyCount} nodes)`,
-              providerName: parsed.providerName,
-              providerRuleSetIds: parsed.providerRuleSetIds || [],
-              providerRuleSetNames: parsed.providerRuleSetNames || [],
-              providerRuleSetCount: parsed.providerRuleSetCount || 0,
-            });
-          }
-        } catch (e) {
-        console.warn('[SubscriptionAPI] Failed to parse subscription:', key.name);
-      }
-    }
+    const requestedIds = ids
+      ? ids.split(',').map(id => id.trim()).filter(Boolean)
+      : [];
+    const storedSubscriptions = await listManagedSubscriptions(env, requestedIds);
+    const subscriptions = storedSubscriptions.map(parsed => ({
+      subId: parsed.subId,
+      url: parsed.url,
+      proxyCount: parsed.proxyCount,
+      fetchedAt: parsed.fetchedAt,
+      name: parsed.name || `Subscription (${parsed.proxyCount} nodes)`,
+      providerName: parsed.providerName,
+      providerRuleSetIds: parsed.providerRuleSetIds || [],
+      providerRuleSetNames: parsed.providerRuleSetNames || [],
+      providerRuleSetCount: parsed.providerRuleSetCount || 0,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -184,7 +155,7 @@ export async function GET(request) {
   }
 }
 
-// DELETE - Remove cached subscription
+// DELETE - Remove a globally managed subscription
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -198,7 +169,7 @@ export async function DELETE(request) {
       );
     }
 
-    await env.SUBMGR_KV.delete(subId);
+    await deleteManagedSubscription(env, subId);
     console.log('[SubscriptionAPI] Deleted subscription:', subId);
 
     return NextResponse.json({

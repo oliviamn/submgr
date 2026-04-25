@@ -84,7 +84,10 @@ export function DashboardProvider({ children }) {
     setRemarks('');
     setConfigCreatedTime('');
     setCustomRules([]);
-    setSubscriptions([]);
+    setSubscriptions((currentSubscriptions) => currentSubscriptions.map(subscription => ({
+      ...subscription,
+      enabled: false,
+    })));
     setSelectedProviderRuleSetIds([]);
 
     // Set view to subscriptions
