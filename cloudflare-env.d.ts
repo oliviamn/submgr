@@ -3,4 +3,5 @@
 
 interface CloudflareEnv {
     SUBMGR_KV: KVNamespace;
+    SUBMGR_ADMIN_KEY?: string;
 }
