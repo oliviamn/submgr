@@ -23,7 +23,7 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { type, config, shortCode, subscriptionIds, standaloneProxies } = await request.json();
+    const { type, config, shortCode, subscriptionIds, proxyNodeIds, standaloneProxies } = await request.json();
     const { env } = getCloudflareContext();
 
     if (!type || !config || !shortCode) {
@@ -47,6 +47,7 @@ export async function POST(request) {
         const rawConfig = {
           ...config,
           subscriptionIds: subscriptionIds || [],
+          proxyNodeIds: proxyNodeIds || [],
           standaloneProxies: standaloneProxies || '',
           version: '2.0',
         };

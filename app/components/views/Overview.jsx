@@ -7,16 +7,19 @@ export default function Overview() {
     const {
         shortCodeInput, setShortCodeInput,
         isLoading, setIsLoading, error, setError,
-        subscriptions, standaloneProxies,
-        customRules, setActiveView,
+        subscriptions, setActiveView,
         setStandaloneProxies, setSubscriptions,
         setRemarks, setConfigCreatedTime,
         setAdvancedOptions, setSelectedRules,
         setSelectedRulePreset, setCustomRules,
-        setSelectedProviderRuleSetIds,
+        selectedProviderRuleSetIds, setSelectedProviderRuleSetIds,
+        setProxyNodes,
+        selectedProxyNodeIds, setSelectedProxyNodeIds,
         setProxyEnabled, setProxyUrl,
         setShortLinks, setConvertedConfigs,
-        startNewConfig
+        startNewConfig,
+        refreshProxyNodes,
+        refreshProviderRuleSets
     } = useDashboard();
 
     const handleLoadConfig = async () => {
@@ -72,7 +75,50 @@ export default function Overview() {
                         setSubscriptions(loadedSubs);
                     }
                 }
-                setStandaloneProxies(config.standaloneProxies || configData.standaloneProxies || '');
+                const proxyNodeIds = config.proxyNodeIds || configData.proxyNodeIds || [];
+                if (proxyNodeIds.length > 0) {
+                    const proxyResponse = await fetch(`/api/proxies?ids=${encodeURIComponent(proxyNodeIds.join(','))}`);
+                    const proxyData = await proxyResponse.json();
+                    if (proxyData.success) {
+                        setProxyNodes((currentProxyNodes) => {
+                            const selectedIds = new Set(proxyNodeIds);
+                            const existingMap = new Map(currentProxyNodes.map(proxyNode => [proxyNode.id, proxyNode]));
+                            return (proxyData.proxyNodes || []).map(proxyNode => ({
+                                ...proxyNode,
+                                enabled: selectedIds.has(proxyNode.id),
+                                rawValue: existingMap.get(proxyNode.id)?.rawValue || proxyNode.rawValue,
+                            }));
+                        });
+                        setSelectedProxyNodeIds(proxyNodeIds);
+                    }
+                } else {
+                    setSelectedProxyNodeIds([]);
+                }
+
+                const legacyStandaloneProxies = config.standaloneProxies || configData.standaloneProxies || '';
+                if (legacyStandaloneProxies.trim()) {
+                    const proxyImportResponse = await fetch('/api/proxies', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            content: legacyStandaloneProxies,
+                        }),
+                    });
+
+                    const proxyImportData = await proxyImportResponse.json();
+                    if (proxyImportData.success) {
+                        const importedIds = (proxyImportData.proxyNodes || []).map(proxyNode => proxyNode.id);
+                        setSelectedProxyNodeIds(importedIds);
+                        await refreshProxyNodes();
+                        setStandaloneProxies('');
+                    } else {
+                        setStandaloneProxies(legacyStandaloneProxies);
+                    }
+                } else {
+                    setStandaloneProxies('');
+                }
             } else {
                 setStandaloneProxies(configData.inputValue || '');
                 setSubscriptions([]);
@@ -86,8 +132,54 @@ export default function Overview() {
                 setAdvancedOptions(configData.rules.advancedOptions || false);
                 setSelectedRules(configData.rules.selectedRules || []);
                 setSelectedRulePreset(configData.rules.selectedRulePreset || 'custom');
-                setSelectedProviderRuleSetIds(configData.rules.selectedProviderRuleSetIds || []);
-                setCustomRules(configData.rules.customRules || []);
+                let selectedRuleSetIds = configData.rules.selectedProviderRuleSetIds || [];
+                const legacyCustomRules = configData.rules.customRules || [];
+                if (legacyCustomRules.length > 0) {
+                    const savedRuleSets = await Promise.all(
+                        legacyCustomRules.map(async (rule) => {
+                            const response = await fetch('/api/rulesets', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    ruleSet: {
+                                        name: rule.name,
+                                        outbound: rule.name,
+                                        displayName: rule.name,
+                                        source: {
+                                            kind: 'manual',
+                                            providerName: 'Custom',
+                                        },
+                                        rules: {
+                                            site_rules: rule.site ? rule.site.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                            ip_rules: rule.ip ? rule.ip.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                            domain_suffix: rule.domain_suffix ? rule.domain_suffix.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                            domain_keyword: rule.domain_keyword ? rule.domain_keyword.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                            ip_cidr: rule.ip_cidr ? rule.ip_cidr.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                            protocol: rule.protocol ? rule.protocol.split(',').map(value => value.trim()).filter(Boolean) : [],
+                                        },
+                                    },
+                                }),
+                            });
+
+                            if (!response.ok) {
+                                return null;
+                            }
+
+                            const data = await response.json();
+                            return data.ruleSet;
+                        })
+                    );
+
+                    selectedRuleSetIds = [
+                        ...selectedRuleSetIds,
+                        ...savedRuleSets.filter(Boolean).map(ruleSet => ruleSet.id),
+                    ];
+                    await refreshProviderRuleSets();
+                }
+                setSelectedProviderRuleSetIds(Array.from(new Set(selectedRuleSetIds)));
+                setCustomRules([]);
                 setProxyEnabled(configData.rules.proxyEnabled || false);
                 setProxyUrl(configData.rules.proxyUrl || '');
             }
@@ -141,8 +233,8 @@ export default function Overview() {
                         </div>
                         <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Edit</span>
                     </div>
-                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{standaloneProxies ? 'Yes' : 'No'}</h3>
-                    <p className="text-gray-500 font-medium">Standalone Proxies</p>
+                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{selectedProxyNodeIds.length}</h3>
+                    <p className="text-gray-500 font-medium">Selected Proxy Nodes</p>
                 </div>
 
                 <div
@@ -155,8 +247,8 @@ export default function Overview() {
                         </div>
                         <span className="bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">Config</span>
                     </div>
-                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{customRules.length}</h3>
-                    <p className="text-gray-500 font-medium">Custom Rules</p>
+                    <h3 className="text-4xl font-bold text-gray-800 mb-1">{new Set(selectedProviderRuleSetIds).size}</h3>
+                    <p className="text-gray-500 font-medium">Rule Libraries</p>
                 </div>
             </div>
 

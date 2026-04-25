@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useDashboard } from '../dashboard/DashboardContext';
 import { t } from '../../lib/i18n';
 
@@ -29,6 +30,16 @@ export default function RulesView() {
         setSelectedProviderRuleSetIds,
         refreshProviderRuleSets
     } = useDashboard();
+    const [draftRuleSet, setDraftRuleSet] = useState({
+        name: '',
+        site: '',
+        ip: '',
+        domain_suffix: '',
+        domain_keyword: '',
+        ip_cidr: '',
+        protocol: '',
+    });
+    const [isSavingRuleSet, setIsSavingRuleSet] = useState(false);
 
     // Handle rule preset change
     const handleRulePresetChange = (preset) => {
@@ -50,21 +61,11 @@ export default function RulesView() {
         });
     };
 
-    const addCustomRule = () => {
-        setCustomRules([...customRules, {
-            name: '', site: '', ip: '', domain_suffix: '',
-            domain_keyword: '', ip_cidr: '', protocol: ''
-        }]);
-    };
-
-    const removeCustomRule = (idx) => {
-        setCustomRules(customRules.filter((_, i) => i !== idx));
-    };
-
-    const updateCustomRule = (idx, field, value) => {
-        setCustomRules(customRules.map((rule, i) =>
-            i === idx ? { ...rule, [field]: value } : rule
-        ));
+    const updateDraftRuleSet = (field, value) => {
+        setDraftRuleSet((currentRuleSet) => ({
+            ...currentRuleSet,
+            [field]: value,
+        }));
     };
 
     const toggleProviderRuleSet = (ruleSetId) => {
@@ -81,6 +82,73 @@ export default function RulesView() {
         }
 
         return new Date(updatedAt).toLocaleString();
+    };
+
+    const saveDraftRuleSet = async () => {
+        if (!draftRuleSet.name.trim()) {
+            return;
+        }
+
+        setIsSavingRuleSet(true);
+        try {
+            const response = await fetch('/api/rulesets', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ruleSet: {
+                        name: draftRuleSet.name,
+                        outbound: draftRuleSet.name,
+                        displayName: draftRuleSet.name,
+                        source: {
+                            kind: 'manual',
+                            providerName: 'Custom',
+                        },
+                        rules: {
+                            site_rules: draftRuleSet.site ? draftRuleSet.site.split(',').map(value => value.trim()).filter(Boolean) : [],
+                            ip_rules: draftRuleSet.ip ? draftRuleSet.ip.split(',').map(value => value.trim()).filter(Boolean) : [],
+                            domain_suffix: draftRuleSet.domain_suffix ? draftRuleSet.domain_suffix.split(',').map(value => value.trim()).filter(Boolean) : [],
+                            domain_keyword: draftRuleSet.domain_keyword ? draftRuleSet.domain_keyword.split(',').map(value => value.trim()).filter(Boolean) : [],
+                            ip_cidr: draftRuleSet.ip_cidr ? draftRuleSet.ip_cidr.split(',').map(value => value.trim()).filter(Boolean) : [],
+                            protocol: draftRuleSet.protocol ? draftRuleSet.protocol.split(',').map(value => value.trim()).filter(Boolean) : [],
+                        },
+                    },
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to save rule set');
+            }
+
+            await refreshProviderRuleSets();
+            setSelectedProviderRuleSetIds((currentIds) => Array.from(new Set([...currentIds, data.ruleSet.id])));
+            setDraftRuleSet({
+                name: '',
+                site: '',
+                ip: '',
+                domain_suffix: '',
+                domain_keyword: '',
+                ip_cidr: '',
+                protocol: '',
+            });
+        } finally {
+            setIsSavingRuleSet(false);
+        }
+    };
+
+    const deleteRuleSet = async (ruleSetId) => {
+        const response = await fetch(`/api/rulesets/${encodeURIComponent(ruleSetId)}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        setSelectedProviderRuleSetIds((currentIds) => currentIds.filter(id => id !== ruleSetId));
+        await refreshProviderRuleSets();
     };
 
     return (
@@ -185,7 +253,7 @@ export default function RulesView() {
                                         <div className="min-w-0">
                                             <div className="font-semibold text-gray-800">{ruleSet.name}</div>
                                             <div className="text-xs text-gray-500 mt-1">
-                                                Source: {ruleSet.source?.providerName || 'Provider'}
+                                                Source: {ruleSet.source?.providerName || 'Provider'} {ruleSet.source?.kind === 'manual' ? '· Manual' : ''}
                                             </div>
                                             <div className="text-xs text-gray-500">
                                                 Updated: {formatUpdatedAt(ruleSet.updatedAt)}
@@ -194,6 +262,16 @@ export default function RulesView() {
                                                 Domains {ruleSet.rules?.domain_suffix?.length || 0} · Keywords {ruleSet.rules?.domain_keyword?.length || 0} · CIDRs {ruleSet.rules?.ip_cidr?.length || 0}
                                             </div>
                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                deleteRuleSet(ruleSet.id);
+                                            }}
+                                            className="ml-4 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
                                 </label>
                             );
@@ -233,62 +311,49 @@ export default function RulesView() {
                 </div>
             </div>
 
-            {/* Custom Rules */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-gray-800">Custom Rules</h3>
+                    <h3 className="text-xl font-bold text-gray-800">Manual Rule Set Library</h3>
                     <button
                         type="button"
-                        onClick={addCustomRule}
+                        onClick={saveDraftRuleSet}
+                        disabled={isSavingRuleSet || !draftRuleSet.name.trim()}
                         className="px-4 py-2 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="16" /><line x1="8" x2="16" y1="12" y2="12" /></svg>
-                        Add Rule
+                        {isSavingRuleSet ? 'Saving...' : 'Save Rule Set'}
                     </button>
                 </div>
 
-                <div className="space-y-4">
-                    {customRules.map((rule, idx) => (
-                        <div key={idx} className="p-6 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white hover:shadow-md transition-all relative group">
-                            <button
-                                type="button"
-                                onClick={() => removeCustomRule(idx)}
-                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors bg-white rounded-full p-1 shadow-sm border border-gray-100 opacity-0 group-hover:opacity-100"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div className="col-span-1 md:col-span-2 lg:col-span-3 mb-2">
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outbound Name (Tag) *</label>
-                                    <input
-                                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-lg font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        placeholder="e.g. My Custom Proxy"
-                                        value={rule.name}
-                                        onChange={e => updateCustomRule(idx, 'name', e.target.value)}
-                                    />
-                                </div>
-
-                                {['site', 'ip', 'domain_suffix', 'domain_keyword', 'ip_cidr', 'protocol'].map((field) => (
-                                    <div key={field}>
-                                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                                            {t(`customRule${field.replace('ip', 'IP').replace('cidr', 'CIDR').replace(/_([a-z])/g, (g) => g[1].toUpperCase()).replace(/^([a-z])/, (g) => g.toUpperCase())}`) || field.replace('_', ' ')}
-                                        </label>
-                                        <input
-                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            value={rule[field]}
-                                            onChange={e => updateCustomRule(idx, field, e.target.value)}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
+                <div className="p-6 border border-gray-200 rounded-xl bg-gray-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="col-span-1 md:col-span-2 lg:col-span-3 mb-2">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outbound Name (Tag) *</label>
+                            <input
+                                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-lg font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="e.g. My Custom Proxy"
+                                value={draftRuleSet.name}
+                                onChange={e => updateDraftRuleSet('name', e.target.value)}
+                            />
                         </div>
-                    ))}
 
-                    {customRules.length === 0 && (
-                        <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                            <p className="text-gray-500">No custom rules defined yet.</p>
-                            <button onClick={addCustomRule} className="mt-2 text-purple-600 hover:text-purple-700 font-medium">Add your first rule</button>
+                        {['site', 'ip', 'domain_suffix', 'domain_keyword', 'ip_cidr', 'protocol'].map((field) => (
+                            <div key={field}>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                    {t(`customRule${field.replace('ip', 'IP').replace('cidr', 'CIDR').replace(/_([a-z])/g, (g) => g[1].toUpperCase()).replace(/^([a-z])/, (g) => g.toUpperCase())}`) || field.replace('_', ' ')}
+                                </label>
+                                <input
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    value={draftRuleSet[field]}
+                                    onChange={e => updateDraftRuleSet(field, e.target.value)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    {customRules.length > 0 && (
+                        <div className="mt-6 p-4 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-800">
+                            This session contains legacy embedded custom rules. They still work, but newly created rules should be saved into the shared library above.
                         </div>
                     )}
                 </div>

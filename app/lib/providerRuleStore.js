@@ -76,6 +76,12 @@ function buildRuleSetId(ruleSet = {}) {
     ruleSet.source?.subscriptionUrl ||
     ruleSet.source?.providerName ||
     ruleSet.source?.subscriptionId ||
+    JSON.stringify({
+      name: ruleSet.name,
+      outbound: ruleSet.outbound,
+      displayName: ruleSet.displayName,
+      rules: ruleSet.rules,
+    }) ||
     GenerateWebPath(8);
 
   return `ruleset_${sanitizeRuleSetName(ruleSet.name || ruleSet.outbound)}_${hashString(stableSourceKey)}`;
@@ -102,6 +108,8 @@ function normalizeRuleSet(ruleSet = {}, existingRuleSet = {}) {
       domain_suffix: uniqueStrings(ruleSet.rules?.domain_suffix || safeExistingRuleSet.rules?.domain_suffix),
       domain_keyword: uniqueStrings(ruleSet.rules?.domain_keyword || safeExistingRuleSet.rules?.domain_keyword),
       ip_cidr: uniqueStrings(ruleSet.rules?.ip_cidr || safeExistingRuleSet.rules?.ip_cidr),
+      site_rules: uniqueStrings(ruleSet.rules?.site_rules || safeExistingRuleSet.rules?.site_rules),
+      ip_rules: uniqueStrings(ruleSet.rules?.ip_rules || safeExistingRuleSet.rules?.ip_rules),
       protocol: uniqueStrings(ruleSet.rules?.protocol || safeExistingRuleSet.rules?.protocol),
       remote_sources: {
         surge: uniqueRemoteSources(

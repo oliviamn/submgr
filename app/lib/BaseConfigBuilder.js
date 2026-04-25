@@ -179,6 +179,8 @@ export class BaseConfigBuilder {
 
     getInlineProviderRules() {
         return (this.providerRuleSets || []).map(ruleSet => ({
+            site_rules: ruleSet?.rules?.site_rules || [],
+            ip_rules: ruleSet?.rules?.ip_rules || [],
             domain_suffix: ruleSet?.rules?.domain_suffix || [],
             domain_keyword: ruleSet?.rules?.domain_keyword || [],
             ip_cidr: ruleSet?.rules?.ip_cidr || [],

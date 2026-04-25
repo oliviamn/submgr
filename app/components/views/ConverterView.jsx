@@ -24,7 +24,9 @@ export default function ConverterView() {
         proxyUrl,
         subscriptions,
         providerRuleSets,
-        selectedProviderRuleSetIds
+        selectedProviderRuleSetIds,
+        proxyNodes,
+        selectedProxyNodeIds
     } = useDashboard();
 
     // Helper to get enabled subscription proxies
@@ -35,6 +37,13 @@ export default function ConverterView() {
                 enabledProxies.push(...sub.proxies);
             }
         }
+
+        for (const proxyNode of proxyNodes) {
+            if (selectedProxyNodeIds.includes(proxyNode.id)) {
+                enabledProxies.push(proxyNode);
+            }
+        }
+
         return enabledProxies;
     };
 
@@ -69,12 +78,24 @@ export default function ConverterView() {
             const userAgent = 'curl/7.74.0';
             const baseConfig = {};
             const selectedProviderRuleSets = providerRuleSets.filter(ruleSet => selectedProviderRuleSetIds.includes(ruleSet.id));
+            const managedCustomRules = selectedProviderRuleSets
+                .filter(ruleSet => ruleSet.source?.kind === 'manual')
+                .map(ruleSet => ({
+                    name: ruleSet.outbound || ruleSet.name,
+                    site: (ruleSet.rules?.site_rules || []).join(','),
+                    ip: (ruleSet.rules?.ip_rules || []).join(','),
+                    domain_suffix: (ruleSet.rules?.domain_suffix || []).join(','),
+                    domain_keyword: (ruleSet.rules?.domain_keyword || []).join(','),
+                    ip_cidr: (ruleSet.rules?.ip_cidr || []).join(','),
+                    protocol: (ruleSet.rules?.protocol || []).join(','),
+                }));
+            const extractedProviderRuleSets = selectedProviderRuleSets.filter(ruleSet => ruleSet.source?.kind !== 'manual');
 
             const builders = {
-                xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
-                singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
-                clash: new ClashConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
-                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets)
+                xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
+                singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
+                clash: new ClashConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
+                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets)
             };
 
             // Generate a single shortcode for all types
@@ -114,7 +135,6 @@ export default function ConverterView() {
                             selectedRules,
                             selectedRulePreset,
                             selectedProviderRuleSetIds,
-                            customRules,
                             proxyEnabled,
                             proxyUrl
                         },
@@ -123,7 +143,7 @@ export default function ConverterView() {
                         version: '2.0'
                     },
                     subscriptionIds,
-                    standaloneProxies,
+                    proxyNodeIds: selectedProxyNodeIds,
                     shortCode,
                 })
             });
@@ -144,7 +164,7 @@ export default function ConverterView() {
                             config,
                             shortCode,
                             subscriptionIds,
-                            standaloneProxies
+                            proxyNodeIds: selectedProxyNodeIds
                         })
                     });
 
