@@ -23,6 +23,10 @@ export default function ProxyView() {
             !value.includes('://') &&
             !value.includes('\n');
 
+        if (error) {
+            setError(null);
+        }
+
         if (isBase64Like) {
             try {
                 // Try to decode
@@ -100,28 +104,37 @@ export default function ProxyView() {
     return (
         <div className="space-y-6">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Standalone Proxy Library</h2>
-                <p className="text-gray-500 mb-6">Paste standalone proxy links here, save them into the shared library, then select them into any session.</p>
-
-                <div className="flex-1 flex flex-col gap-4">
-                    <textarea
-                        className="flex-1 w-full min-h-[400px] p-4 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm leading-relaxed transition-all"
-                        placeholder="Paste standalone proxies here...&#10;vmess://...&#10;vless://...&#10;ss://..."
-                        value={proxyInput}
-                        onChange={(e) => handleStandaloneProxiesChange(e.target.value)}
-                    />
-
-                    <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Standalone Proxy Library</h2>
+                        <p className="text-gray-500">Paste standalone proxy links here, save them into the shared library, then select them into any session.</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
                         <button
                             type="button"
                             onClick={handleSaveProxyNodes}
                             disabled={isSaving || !proxyInput.trim()}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-blue-50 text-blue-700 font-medium rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                         >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="16" /><line x1="8" x2="16" y1="12" y2="12" /></svg>
                             {isSaving ? 'Saving...' : 'Save Standalone Proxies'}
                         </button>
-                        {error && <span className="text-sm text-red-600">{error}</span>}
                     </div>
+                </div>
+
+                {error && (
+                    <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm">
+                        {error}
+                    </div>
+                )}
+
+                <div className="flex-1 flex flex-col gap-4">
+                    <textarea
+                        className="flex-1 w-full min-h-[400px] p-4 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm leading-relaxed transition-all"
+                        placeholder="Paste standalone proxies here...&#10;vmess://...&#10;vless://...&#10;ss://..."
+                        value={proxyInput}
+                        onChange={(e) => handleStandaloneProxiesChange(e.target.value)}
+                    />
 
                     <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
                         <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
