@@ -13,6 +13,7 @@ export default function Overview() {
         setRemarks, setConfigCreatedTime,
         setAdvancedOptions, setSelectedRules,
         setSelectedRulePreset, setCustomRules,
+        setSelectedProviderRuleSetIds,
         setProxyEnabled, setProxyUrl,
         setShortLinks, setConvertedConfigs,
         startNewConfig
@@ -69,6 +70,7 @@ export default function Overview() {
                 setAdvancedOptions(configData.rules.advancedOptions || false);
                 setSelectedRules(configData.rules.selectedRules || []);
                 setSelectedRulePreset(configData.rules.selectedRulePreset || 'custom');
+                setSelectedProviderRuleSetIds(configData.rules.selectedProviderRuleSetIds || []);
                 setCustomRules(configData.rules.customRules || []);
                 setProxyEnabled(configData.rules.proxyEnabled || false);
                 setProxyUrl(configData.rules.proxyUrl || '');

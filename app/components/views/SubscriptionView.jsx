@@ -6,7 +6,8 @@ import SubscriptionManager from '../SubscriptionManager';
 export default function SubscriptionView() {
     const {
         shortCodeInput, setShortCodeInput,
-        subscriptions, setSubscriptions
+        subscriptions, setSubscriptions,
+        refreshProviderRuleSets
     } = useDashboard();
 
     return (
@@ -28,6 +29,7 @@ export default function SubscriptionView() {
                     shortCode={shortCodeInput}
                     subscriptions={subscriptions}
                     onSubscriptionsChange={setSubscriptions}
+                    onProviderRuleSetsChange={refreshProviderRuleSets}
                 />
             </div>
 

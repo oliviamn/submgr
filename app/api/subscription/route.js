@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { ProxyParser } from '../../lib/ProxyParsers.js';
 import { fetchSubscription } from '../../lib/subscriptionFetcher.js';
+import { deriveProviderName, extractAndStoreProviderRuleSets, parseSubscriptionProxies } from '../../lib/subscriptionProcessing.js';
 
 // CORS headers
 const corsHeaders = {
@@ -53,39 +53,7 @@ export async function POST(request) {
       console.log('[SubscriptionAPI] Fetching subscription:', url);
       const text = await fetchSubscription(url, userAgent, proxyUrl);
       console.log(`[SubscriptionAPI] Received ${text.length} bytes`);
-
-      // Decode base64 if needed
-      let decodedText;
-      try {
-        decodedText = atob(text.trim());
-        if (decodedText.includes('%')) {
-          decodedText = decodeURIComponent(decodedText);
-        }
-      } catch (e) {
-        decodedText = text;
-        if (decodedText.includes('%')) {
-          try {
-            decodedText = decodeURIComponent(decodedText);
-          } catch (urlError) {
-            console.warn('[SubscriptionAPI] Failed to URL decode:', urlError);
-          }
-        }
-      }
-
-      // Parse proxy URLs
-      const lines = decodedText.split('\n').filter(line => line.trim() !== '');
-      const proxies = [];
-
-      for (const line of lines) {
-        try {
-          const result = await ProxyParser.parse(line, userAgent);
-          if (result && !Array.isArray(result)) {
-            proxies.push(result);
-          }
-        } catch (e) {
-          console.warn('[SubscriptionAPI] Failed to parse line:', line.substring(0, 50));
-        }
-      }
+      const { proxies } = await parseSubscriptionProxies(text, userAgent);
 
       if (proxies.length === 0) {
         return NextResponse.json(
@@ -95,12 +63,26 @@ export async function POST(request) {
       }
 
       // Cache to KV
+      const extractedRuleResult = await extractAndStoreProviderRuleSets({
+        env,
+        url,
+        subscriptionId: subId,
+        proxyUrl,
+      });
+
+      const extractedRuleSets = extractedRuleResult.extractedRuleSets || [];
       const cacheData = {
         url,
         proxies,
         fetchedAt: new Date().toISOString(),
         proxyCount: proxies.length,
         shortCode,
+        userAgent,
+        proxyUrl,
+        providerName: deriveProviderName(url),
+        providerRuleSetIds: extractedRuleSets.map(ruleSet => ruleSet.id),
+        providerRuleSetNames: extractedRuleSets.map(ruleSet => ruleSet.name),
+        providerRuleSetCount: extractedRuleSets.length,
       };
 
       await env.SUBMGR_KV.put(subId, JSON.stringify(cacheData));
@@ -113,6 +95,9 @@ export async function POST(request) {
         proxyCount: proxies.length,
         fetchedAt: cacheData.fetchedAt,
         name: `Subscription (${proxies.length} nodes)`,
+        providerRuleSetCount: cacheData.providerRuleSetCount,
+        providerRuleSetNames: cacheData.providerRuleSetNames,
+        extractedRuleSets,
       }, { headers: corsHeaders });
 
     } catch (fetchError) {
@@ -167,15 +152,19 @@ export async function GET(request) {
         const data = await env.SUBMGR_KV.get(key.name);
         if (data) {
           const parsed = JSON.parse(data);
-          subscriptions.push({
-            subId: key.name,
-            url: parsed.url,
-            proxyCount: parsed.proxyCount,
-            fetchedAt: parsed.fetchedAt,
-            name: parsed.name || `Subscription (${parsed.proxyCount} nodes)`,
-          });
-        }
-      } catch (e) {
+            subscriptions.push({
+              subId: key.name,
+              url: parsed.url,
+              proxyCount: parsed.proxyCount,
+              fetchedAt: parsed.fetchedAt,
+              name: parsed.name || `Subscription (${parsed.proxyCount} nodes)`,
+              providerName: parsed.providerName,
+              providerRuleSetIds: parsed.providerRuleSetIds || [],
+              providerRuleSetNames: parsed.providerRuleSetNames || [],
+              providerRuleSetCount: parsed.providerRuleSetCount || 0,
+            });
+          }
+        } catch (e) {
         console.warn('[SubscriptionAPI] Failed to parse subscription:', key.name);
       }
     }

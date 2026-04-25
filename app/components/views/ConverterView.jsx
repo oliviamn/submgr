@@ -22,7 +22,9 @@ export default function ConverterView() {
         remarks,
         proxyEnabled,
         proxyUrl,
-        subscriptions
+        subscriptions,
+        providerRuleSets,
+        selectedProviderRuleSetIds
     } = useDashboard();
 
     // Helper to get enabled subscription proxies
@@ -66,12 +68,13 @@ export default function ConverterView() {
             // Create config builders with cached subscription proxies
             const userAgent = 'curl/7.74.0';
             const baseConfig = {};
+            const selectedProviderRuleSets = providerRuleSets.filter(ruleSet => selectedProviderRuleSetIds.includes(ruleSet.id));
 
             const builders = {
-                xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
-                singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
-                clash: new ClashConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies),
-                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies)
+                xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
+                singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, customRules, undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
+                clash: new ClashConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets),
+                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, customRules, baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, selectedProviderRuleSets)
             };
 
             // Generate a single shortcode for all types
@@ -110,6 +113,7 @@ export default function ConverterView() {
                             advancedOptions,
                             selectedRules,
                             selectedRulePreset,
+                            selectedProviderRuleSetIds,
                             customRules,
                             proxyEnabled,
                             proxyUrl

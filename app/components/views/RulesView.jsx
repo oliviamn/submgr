@@ -23,7 +23,11 @@ export default function RulesView() {
         selectedRules, setSelectedRules,
         customRules, setCustomRules,
         proxyEnabled, setProxyEnabled,
-        proxyUrl, setProxyUrl
+        proxyUrl, setProxyUrl,
+        providerRuleSets,
+        selectedProviderRuleSetIds,
+        setSelectedProviderRuleSetIds,
+        refreshProviderRuleSets
     } = useDashboard();
 
     // Handle rule preset change
@@ -61,6 +65,22 @@ export default function RulesView() {
         setCustomRules(customRules.map((rule, i) =>
             i === idx ? { ...rule, [field]: value } : rule
         ));
+    };
+
+    const toggleProviderRuleSet = (ruleSetId) => {
+        setSelectedProviderRuleSetIds((currentIds) => (
+            currentIds.includes(ruleSetId)
+                ? currentIds.filter(id => id !== ruleSetId)
+                : [...currentIds, ruleSetId]
+        ));
+    };
+
+    const formatUpdatedAt = (updatedAt) => {
+        if (!updatedAt) {
+            return 'Unknown update time';
+        }
+
+        return new Date(updatedAt).toLocaleString();
     };
 
     return (
@@ -119,6 +139,67 @@ export default function RulesView() {
                         );
                     })}
                 </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800">Provider Rule Sets</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Persisted rule sets extracted from your subscriptions and reusable across sessions.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={refreshProviderRuleSets}
+                        className="px-4 py-2 bg-gray-50 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                        Refresh
+                    </button>
+                </div>
+
+                {providerRuleSets.length === 0 ? (
+                    <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6">
+                        No saved provider rule sets yet. Add or refresh a subscription to extract them.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {providerRuleSets.map((ruleSet) => {
+                            const checked = selectedProviderRuleSetIds.includes(ruleSet.id);
+
+                            return (
+                                <label
+                                    key={ruleSet.id}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all ${checked
+                                        ? 'bg-indigo-50 border-indigo-200 shadow-sm'
+                                        : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-200'
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleProviderRuleSet(ruleSet.id)}
+                                            className="mt-1 h-5 w-5 cursor-pointer rounded-md border border-gray-300"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="font-semibold text-gray-800">{ruleSet.name}</div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Source: {ruleSet.source?.providerName || 'Provider'}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                                Updated: {formatUpdatedAt(ruleSet.updatedAt)}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-2">
+                                                Domains {ruleSet.rules?.domain_suffix?.length || 0} · Keywords {ruleSet.rules?.domain_keyword?.length || 0} · CIDRs {ruleSet.rules?.ip_cidr?.length || 0}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Advanced Proxy Settings */}

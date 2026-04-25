@@ -24,9 +24,27 @@ export function DashboardProvider({ children }) {
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState('');
   const [subscriptions, setSubscriptions] = useState([]);
+  const [providerRuleSets, setProviderRuleSets] = useState([]);
+  const [selectedProviderRuleSetIds, setSelectedProviderRuleSetIds] = useState([]);
 
   // --- Active View State ---
   const [activeView, setActiveView] = useState('overview'); // overview, subscriptions, proxies, rules, convert
+
+  const refreshProviderRuleSets = async () => {
+    try {
+      const response = await fetch('/api/rulesets');
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setProviderRuleSets(data.ruleSets || []);
+      }
+    } catch (error) {
+      console.warn('Failed to refresh provider rule sets:', error);
+    }
+  };
 
   // --- Initialization ---
   useEffect(() => {
@@ -41,6 +59,8 @@ export function DashboardProvider({ children }) {
         setShortCodeInput(savedShortCode);
       }
     }
+
+    refreshProviderRuleSets();
   }, []);
 
   const handleLanguageChange = (lang) => {
@@ -65,6 +85,7 @@ export function DashboardProvider({ children }) {
     setConfigCreatedTime('');
     setCustomRules([]);
     setSubscriptions([]);
+    setSelectedProviderRuleSetIds([]);
 
     // Set view to subscriptions
     setActiveView('subscriptions');
@@ -91,11 +112,14 @@ export function DashboardProvider({ children }) {
     proxyEnabled, setProxyEnabled,
     proxyUrl, setProxyUrl,
     subscriptions, setSubscriptions,
+    providerRuleSets, setProviderRuleSets,
+    selectedProviderRuleSetIds, setSelectedProviderRuleSetIds,
     activeView, setActiveView,
 
     // Actions
     handleLanguageChange,
-    startNewConfig
+    startNewConfig,
+    refreshProviderRuleSets
   };
 
   return (

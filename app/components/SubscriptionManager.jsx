@@ -7,6 +7,7 @@ export default function SubscriptionManager({
   shortCode,
   subscriptions,
   onSubscriptionsChange,
+  onProviderRuleSetsChange,
   userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
 }) {
   const [newSubUrl, setNewSubUrl] = useState('');
@@ -41,7 +42,15 @@ export default function SubscriptionManager({
               const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(sub.subId)}`);
               if (fullSubResponse.ok) {
                 const fullSubData = await fullSubResponse.json();
-                return { ...sub, proxies: fullSubData.proxies || [], enabled: true };
+                return {
+                  ...sub,
+                  proxies: fullSubData.proxies || [],
+                  enabled: true,
+                  providerRuleSetIds: fullSubData.providerRuleSetIds || [],
+                  providerRuleSetNames: fullSubData.providerRuleSetNames || [],
+                  providerRuleSetCount: fullSubData.providerRuleSetCount || 0,
+                  providerName: fullSubData.providerName,
+                };
               }
             } catch (e) {
               console.warn('Failed to load full subscription:', sub.subId);
@@ -106,10 +115,13 @@ export default function SubscriptionManager({
         fetchedAt: data.fetchedAt,
         name: data.name,
         enabled: true,
-        proxies: proxies
+        proxies: proxies,
+        providerRuleSetCount: data.providerRuleSetCount || 0,
+        providerRuleSetNames: data.providerRuleSetNames || [],
       };
 
       onSubscriptionsChange([...subscriptions, newSub]);
+      await onProviderRuleSetsChange?.();
       setNewSubUrl('');
     } catch (err) {
       setError(err.message);
@@ -144,10 +156,19 @@ export default function SubscriptionManager({
       // Update the subscription in the list
       const updatedSubs = subscriptions.map(s =>
         s.subId === data.subId
-          ? { ...s, proxyCount: data.proxyCount, fetchedAt: data.fetchedAt, name: data.name, proxies }
+          ? {
+              ...s,
+              proxyCount: data.proxyCount,
+              fetchedAt: data.fetchedAt,
+              name: data.name,
+              proxies,
+              providerRuleSetCount: data.providerRuleSetCount || 0,
+              providerRuleSetNames: data.providerRuleSetNames || [],
+            }
           : s
       );
       onSubscriptionsChange(updatedSubs);
+      await onProviderRuleSetsChange?.();
     } catch (err) {
       setError(err.message);
       console.error('Refresh subscription error:', err);
@@ -294,6 +315,11 @@ export default function SubscriptionManager({
                   <p className="text-xs text-gray-500">
                     {sub.proxyCount} {t('nodesCount')} · {formatTimeAgo(sub.fetchedAt)}
                   </p>
+                  {sub.providerRuleSetCount > 0 && (
+                    <p className="text-xs text-purple-600">
+                      {sub.providerRuleSetCount} provider rule set{sub.providerRuleSetCount > 1 ? 's' : ''}: {(sub.providerRuleSetNames || []).join(', ')}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-2">

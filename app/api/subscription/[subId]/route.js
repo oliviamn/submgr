@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { ProxyParser } from '../../../lib/ProxyParsers.js';
 import { fetchSubscription } from '../../../lib/subscriptionFetcher.js';
+import { deriveProviderName, extractAndStoreProviderRuleSets, parseSubscriptionProxies } from '../../../lib/subscriptionProcessing.js';
 
 // CORS headers
 const corsHeaders = {
@@ -80,40 +80,8 @@ export async function PUT(request, { params }) {
     try {
       // Re-fetch the subscription using the shared fetcher
       console.log('[SubscriptionAPI] Refreshing subscription:', url);
-      const text = await fetchSubscription(url, userAgent);
-
-      // Decode base64 if needed
-      let decodedText;
-      try {
-        decodedText = atob(text.trim());
-        if (decodedText.includes('%')) {
-          decodedText = decodeURIComponent(decodedText);
-        }
-      } catch (e) {
-        decodedText = text;
-        if (decodedText.includes('%')) {
-          try {
-            decodedText = decodeURIComponent(decodedText);
-          } catch (urlError) {
-            console.warn('[SubscriptionAPI] Failed to URL decode:', urlError);
-          }
-        }
-      }
-
-      // Parse proxy URLs
-      const lines = decodedText.split('\n').filter(line => line.trim() !== '');
-      const proxies = [];
-
-      for (const line of lines) {
-        try {
-          const result = await ProxyParser.parse(line, userAgent);
-          if (result && !Array.isArray(result)) {
-            proxies.push(result);
-          }
-        } catch (e) {
-          console.warn('[SubscriptionAPI] Failed to parse line:', line.substring(0, 50));
-        }
-      }
+      const text = await fetchSubscription(url, userAgent, parsed.proxyUrl);
+      const { proxies } = await parseSubscriptionProxies(text, userAgent);
 
       if (proxies.length === 0) {
         return NextResponse.json(
@@ -123,12 +91,32 @@ export async function PUT(request, { params }) {
       }
 
       // Update cache
+      const extractedRuleResult = await extractAndStoreProviderRuleSets({
+        env,
+        url,
+        subscriptionId: subId,
+        proxyUrl: parsed.proxyUrl,
+      });
+
+      const extractedRuleSets = extractedRuleResult.extractedRuleSets?.length > 0
+        ? extractedRuleResult.extractedRuleSets
+        : (parsed.providerRuleSetIds || []).map((id, index) => ({
+            id,
+            name: parsed.providerRuleSetNames?.[index] || id,
+          }));
+
       const cacheData = {
         url,
         proxies,
         fetchedAt: new Date().toISOString(),
         proxyCount: proxies.length,
         shortCode: parsed.shortCode,
+        userAgent,
+        proxyUrl: parsed.proxyUrl,
+        providerName: parsed.providerName || deriveProviderName(url),
+        providerRuleSetIds: extractedRuleSets.map(ruleSet => ruleSet.id),
+        providerRuleSetNames: extractedRuleSets.map(ruleSet => ruleSet.name),
+        providerRuleSetCount: extractedRuleSets.length,
       };
 
       await env.SUBMGR_KV.put(subId, JSON.stringify(cacheData));
@@ -141,6 +129,9 @@ export async function PUT(request, { params }) {
         proxyCount: proxies.length,
         fetchedAt: cacheData.fetchedAt,
         name: `Subscription (${proxies.length} nodes)`,
+        providerRuleSetCount: cacheData.providerRuleSetCount,
+        providerRuleSetNames: cacheData.providerRuleSetNames,
+        extractedRuleSets,
       }, { headers: corsHeaders });
 
     } catch (fetchError) {

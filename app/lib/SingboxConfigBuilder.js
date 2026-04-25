@@ -4,14 +4,14 @@ import { DeepCopy } from './utils.js';
 import { t } from './i18n/index.js';
 
 export class SingboxConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = []) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = [], providerRuleSets = []) {
         if (baseConfig === undefined) {
             baseConfig = SING_BOX_CONFIG;
             if (baseConfig.dns && baseConfig.dns.servers) {
                 baseConfig.dns.servers[0].detour = t('outboundNames.Node Select');
             }
         }
-        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies);
+        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies, providerRuleSets);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
         this.proxyEnabled = proxyEnabled;
@@ -102,11 +102,12 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
 
     formatConfig() {
         const rules = generateRules(this.selectedRules, this.customRules);
+        const providerRules = this.getInlineProviderRules();
         const { site_rule_sets, ip_rule_sets } = generateRuleSets(this.selectedRules, this.customRules, this.proxyEnabled, this.proxyUrl);
 
         this.config.route.rule_set = [...site_rule_sets, ...ip_rule_sets];
 
-        rules.filter(rule => !!rule.domain_suffix || !!rule.domain_keyword).map(rule => {
+        [...rules, ...providerRules].filter(rule => !!rule.domain_suffix || !!rule.domain_keyword).map(rule => {
             this.config.route.rules.push({
                 domain_suffix: rule.domain_suffix,
                 domain_keyword: rule.domain_keyword,
@@ -135,7 +136,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
           });
         });
 
-        rules.filter(rule => !!rule.ip_cidr).map(rule => {
+        [...rules, ...providerRules].filter(rule => !!rule.ip_cidr).map(rule => {
             this.config.route.rules.push({
                 ip_cidr: rule.ip_cidr,
                 protocol: rule.protocol,
