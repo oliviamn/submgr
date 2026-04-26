@@ -19,7 +19,8 @@ export default function ConverterView() {
         error, setError,
         shortLinks, setShortLinks,
         shortCodeInput, setShortCodeInput,
-        remarks,
+        remarks, setRemarks,
+        configCreatedTime,
         proxyEnabled,
         proxyUrl,
         subscriptions,
@@ -196,6 +197,39 @@ export default function ConverterView() {
 
     return (
         <div className="space-y-6">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Session Details</h2>
+                        <p className="text-gray-500">Name this session so it is easy to find later in the Sessions library.</p>
+                    </div>
+                    {shortCodeInput && (
+                        <span className="px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 font-mono">
+                            {shortCodeInput}
+                        </span>
+                    )}
+                </div>
+
+                <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">
+                        Session Name / Description
+                    </label>
+                    <textarea
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        placeholder="e.g. 自建节点+Wget（不含公司)"
+                        className="w-full min-h-24 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                    />
+                    <p className="text-sm text-gray-500">
+                        This text is saved with the session and shown in the Sessions view for browsing and rename.
+                    </p>
+                    {configCreatedTime && (
+                        <div className="text-xs text-gray-500">
+                            Last loaded: {new Date(configCreatedTime).toLocaleString(currentLang)}
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {/* Conversion Action */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">

@@ -1,341 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useDashboard } from '../dashboard/DashboardContext';
 
 export default function Overview() {
     const {
         shortCodeInput, setShortCodeInput,
-        isLoading, setIsLoading, error, setError,
+        isLoading, error, setError,
         subscriptions, setActiveView,
-        setStandaloneProxies, setSubscriptions,
-        setRemarks, setConfigCreatedTime,
-        setAdvancedOptions, setSelectedRules,
-        setSelectedRulePreset, setCustomRules,
-        selectedProviderRuleSetIds, setSelectedProviderRuleSetIds,
-        setProxyNodes,
-        selectedProxyNodeIds, setSelectedProxyNodeIds,
-        setProxyEnabled, setProxyUrl,
-        setShortLinks, setConvertedConfigs,
+        selectedProviderRuleSetIds,
+        selectedProxyNodeIds,
         startNewConfig,
-        refreshProxyNodes,
-        refreshProviderRuleSets
+        loadConfigByShortCode
     } = useDashboard();
-
-    const [sessionAdminKey, setSessionAdminKey] = useState('');
-    const [managedSessions, setManagedSessions] = useState([]);
-    const [sessionListError, setSessionListError] = useState(null);
-    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
-
-    const loadManagedSessions = async (providedKey = sessionAdminKey) => {
-        const normalizedAdminKey = providedKey.trim();
-        if (!normalizedAdminKey) {
-            setSessionListError('Enter the admin key to browse saved sessions.');
-            setManagedSessions([]);
-            return;
-        }
-
-        try {
-            setIsLoadingSessions(true);
-            const response = await fetch('/api/sessions', {
-                headers: {
-                    'x-submgr-admin-key': normalizedAdminKey,
-                },
-            });
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to load saved sessions');
-            }
-
-            setManagedSessions(data.sessions || []);
-            setSessionListError(null);
-            setSessionAdminKey(normalizedAdminKey);
-            if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem('submgrSessionAdminKey', normalizedAdminKey);
-            }
-        } catch (loadError) {
-            setManagedSessions([]);
-            setSessionListError(loadError.message);
-            if (typeof window !== 'undefined') {
-                window.sessionStorage.removeItem('submgrSessionAdminKey');
-            }
-        } finally {
-            setIsLoadingSessions(false);
-        }
-    };
-
-    const syncSessionIndex = async (shortCode) => {
-        const normalizedAdminKey = sessionAdminKey.trim();
-        if (!normalizedAdminKey || !shortCode) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/sessions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-submgr-admin-key': normalizedAdminKey,
-                },
-                body: JSON.stringify({ shortCode }),
-            });
-
-            if (!response.ok) {
-                return;
-            }
-
-            await loadManagedSessions(normalizedAdminKey);
-        } catch (syncError) {
-            console.warn('Failed to sync session index:', syncError);
-        }
-    };
-
-    const handleDeleteManagedSession = async (shortCode) => {
-        const normalizedAdminKey = sessionAdminKey.trim();
-        if (!normalizedAdminKey || !shortCode) {
-            return;
-        }
-
-        if (typeof window !== 'undefined' && !window.confirm(`Delete saved session ${shortCode}?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/sessions/${encodeURIComponent(shortCode)}`, {
-                method: 'DELETE',
-                headers: {
-                    'x-submgr-admin-key': normalizedAdminKey,
-                },
-            });
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to delete saved session');
-            }
-
-            await loadManagedSessions(normalizedAdminKey);
-        } catch (deleteError) {
-            setSessionListError(deleteError.message);
-        }
-    };
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const savedAdminKey = window.sessionStorage.getItem('submgrSessionAdminKey');
-        if (savedAdminKey) {
-            setSessionAdminKey(savedAdminKey);
-            loadManagedSessions(savedAdminKey);
-        }
-    }, []);
-
-    const handleLoadConfig = async (requestedShortCode = shortCodeInput) => {
-        const resolvedShortCode = typeof requestedShortCode === 'string'
-            ? requestedShortCode
-            : shortCodeInput;
-        const normalizedShortCode = resolvedShortCode.trim();
-        console.log('Loading config for shortcode:', normalizedShortCode);
-        if (!normalizedShortCode) {
-            setError('Please enter a short code');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            setShortCodeInput(normalizedShortCode);
-            if (typeof window !== 'undefined') {
-                window.localStorage.setItem('lastShortCode', normalizedShortCode);
-            }
-
-            const response = await fetch(`/api/raw/${normalizedShortCode}`);
-            if (!response.ok) {
-                throw new Error('Failed to load configuration');
-            }
-
-            const config = await response.json();
-            console.log('Loaded config:', config);
-
-            const configData = config.config || config;
-
-            // Handle v2 format
-            if (config.version === '2.0' || configData.version === '2.0') {
-                if (config.subscriptionIds || configData.subscriptionIds) {
-                    const subIds = config.subscriptionIds || configData.subscriptionIds || [];
-                    const subResponse = await fetch(`/api/subscription?ids=${encodeURIComponent(subIds.join(','))}`);
-                    const subData = await subResponse.json();
-
-                    if (subData.success) {
-                        const loadedSubs = await Promise.all(
-                            (subData.subscriptions || []).map(async (s) => {
-                                try {
-                                    const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(s.subId)}`);
-                                    if (fullSubResponse.ok) {
-                                        const fullSubData = await fullSubResponse.json();
-                                        return {
-                                            ...s,
-                                            proxies: fullSubData.proxies || [],
-                                            enabled: subIds.includes(s.subId),
-                                            providerRuleSetIds: fullSubData.providerRuleSetIds || [],
-                                            providerRuleSetNames: fullSubData.providerRuleSetNames || [],
-                                            providerRuleSetCount: fullSubData.providerRuleSetCount || 0,
-                                            providerName: fullSubData.providerName,
-                                        };
-                                    }
-                                } catch (error) {
-                                    console.warn('Failed to load full subscription:', s.subId);
-                                }
-
-                                return { ...s, proxies: [], enabled: subIds.includes(s.subId) };
-                            })
-                        );
-                        setSubscriptions(loadedSubs);
-                    }
-                }
-                const proxyNodeIds = config.proxyNodeIds || configData.proxyNodeIds || [];
-                if (proxyNodeIds.length > 0) {
-                    const proxyResponse = await fetch(`/api/proxies?ids=${encodeURIComponent(proxyNodeIds.join(','))}`);
-                    const proxyData = await proxyResponse.json();
-                    if (proxyData.success) {
-                        setProxyNodes((currentProxyNodes) => {
-                            const selectedIds = new Set(proxyNodeIds);
-                            const existingMap = new Map(currentProxyNodes.map(proxyNode => [proxyNode.id, proxyNode]));
-                            return (proxyData.proxyNodes || []).map(proxyNode => ({
-                                ...proxyNode,
-                                enabled: selectedIds.has(proxyNode.id),
-                                rawValue: existingMap.get(proxyNode.id)?.rawValue || proxyNode.rawValue,
-                            }));
-                        });
-                        setSelectedProxyNodeIds(proxyNodeIds);
-                    }
-                } else {
-                    setSelectedProxyNodeIds([]);
-                }
-
-                const legacyStandaloneProxies = config.standaloneProxies || configData.standaloneProxies || '';
-                if (legacyStandaloneProxies.trim()) {
-                    const proxyImportResponse = await fetch('/api/proxies', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            content: legacyStandaloneProxies,
-                        }),
-                    });
-
-                    const proxyImportData = await proxyImportResponse.json();
-                    if (proxyImportData.success) {
-                        const importedIds = (proxyImportData.proxyNodes || []).map(proxyNode => proxyNode.id);
-                        setSelectedProxyNodeIds(importedIds);
-                        await refreshProxyNodes();
-                        setStandaloneProxies('');
-                    } else {
-                        setStandaloneProxies(legacyStandaloneProxies);
-                    }
-                } else {
-                    setStandaloneProxies('');
-                }
-            } else {
-                setStandaloneProxies(configData.inputValue || '');
-                setSubscriptions([]);
-            }
-
-            setRemarks(configData.remarks || '');
-            setConfigCreatedTime(configData.configCreatedTime || '');
-
-            // Rules
-            if (configData.rules) {
-                setAdvancedOptions(configData.rules.advancedOptions || false);
-                setSelectedRules(configData.rules.selectedRules || []);
-                setSelectedRulePreset(configData.rules.selectedRulePreset || 'custom');
-                let selectedRuleSetIds = configData.rules.selectedProviderRuleSetIds || [];
-                const legacyCustomRules = configData.rules.customRules || [];
-                if (legacyCustomRules.length > 0) {
-                    const savedRuleSets = await Promise.all(
-                        legacyCustomRules.map(async (rule) => {
-                            const response = await fetch('/api/rulesets', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    ruleSet: {
-                                        name: rule.name,
-                                        outbound: rule.name,
-                                        displayName: rule.name,
-                                        source: {
-                                            kind: 'manual',
-                                            providerName: 'Custom',
-                                        },
-                                        rules: {
-                                            site_rules: rule.site ? rule.site.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                            ip_rules: rule.ip ? rule.ip.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                            domain_suffix: rule.domain_suffix ? rule.domain_suffix.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                            domain_keyword: rule.domain_keyword ? rule.domain_keyword.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                            ip_cidr: rule.ip_cidr ? rule.ip_cidr.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                            protocol: rule.protocol ? rule.protocol.split(',').map(value => value.trim()).filter(Boolean) : [],
-                                        },
-                                    },
-                                }),
-                            });
-
-                            if (!response.ok) {
-                                return null;
-                            }
-
-                            const data = await response.json();
-                            return data.ruleSet;
-                        })
-                    );
-
-                    selectedRuleSetIds = [
-                        ...selectedRuleSetIds,
-                        ...savedRuleSets.filter(Boolean).map(ruleSet => ruleSet.id),
-                    ];
-                    await refreshProviderRuleSets();
-                }
-                setSelectedProviderRuleSetIds(Array.from(new Set(selectedRuleSetIds)));
-                setCustomRules([]);
-                setProxyEnabled(configData.rules.proxyEnabled || false);
-                setProxyUrl(configData.rules.proxyUrl || '');
-            }
-
-            setConvertedConfigs({
-                xray: { type: 'xray' },
-                singbox: { type: 'singbox' },
-                clash: { type: 'clash' },
-                surge: { type: 'surge' }
-            });
-
-            const newShortLinks = {};
-            ['xray', 'singbox', 'clash', 'surge'].forEach(type => {
-                newShortLinks[type] = `${window.location.origin}/api/${type}/${normalizedShortCode}`;
-            });
-            setShortLinks(newShortLinks);
-
-            await syncSessionIndex(normalizedShortCode);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const formatSessionTimestamp = (value) => {
-        if (!value) {
-            return 'Unknown';
-        }
-
-        try {
-            return new Date(value).toLocaleString();
-        } catch (error) {
-            return value;
-        }
-    };
 
     return (
         <div className="space-y-8">
@@ -410,7 +86,7 @@ export default function Overview() {
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
                         </div>
                          <h2 className="text-2xl font-bold text-gray-800 mb-2">Load Existing</h2>
-                         <p className="text-gray-500 mb-4">Retrieve a previously saved configuration using its shortcode, or unlock the saved session library below.</p>
+                         <p className="text-gray-500 mb-4">Retrieve a previously saved configuration using its shortcode, or manage all saved sessions from the dedicated Sessions view.</p>
 
                          <div className="flex gap-3 mt-auto">
                              <input
@@ -423,11 +99,11 @@ export default function Overview() {
                                  }}
                                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all font-mono text-lg"
                              />
-                            <button
-                                onClick={handleLoadConfig}
-                                disabled={isLoading}
-                                className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-colors disabled:opacity-50"
-                            >
+                             <button
+                                 onClick={loadConfigByShortCode}
+                                 disabled={isLoading}
+                                 className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-colors disabled:opacity-50"
+                             >
                                 {isLoading ? '...' : 'Load'}
                             </button>
                         </div>
@@ -439,84 +115,21 @@ export default function Overview() {
                          )}
 
                          <div className="mt-6 pt-6 border-t border-gray-100">
-                             <div className="flex items-center justify-between gap-3 mb-3">
-                                 <div>
-                                     <h3 className="text-lg font-semibold text-gray-800">Saved Session Library</h3>
-                                     <p className="text-sm text-gray-500">Unlock with the admin key to browse saved shortcodes. Manual shortcode loads are auto-indexed after unlock.</p>
+                             <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-5">
+                                 <div className="flex items-start justify-between gap-4">
+                                     <div>
+                                         <h3 className="text-lg font-semibold text-gray-800">Need the full session library?</h3>
+                                         <p className="text-sm text-gray-500 mt-1">Use the dedicated Sessions view to unlock, browse, rename, search, and delete saved sessions without stretching this page.</p>
+                                     </div>
+                                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 shrink-0">Protected</span>
                                  </div>
-                                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Protected</span>
-                             </div>
-
-                             <div className="flex gap-3">
-                                 <input
-                                     type="password"
-                                     placeholder="Admin key"
-                                     value={sessionAdminKey}
-                                     onChange={(e) => {
-                                         setSessionAdminKey(e.target.value);
-                                         setSessionListError(null);
-                                     }}
-                                     className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                                 />
                                  <button
-                                     onClick={() => loadManagedSessions()}
-                                     disabled={isLoadingSessions}
-                                     className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50"
+                                     onClick={() => setActiveView('sessions')}
+                                     className="mt-4 px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors"
                                  >
-                                     {isLoadingSessions ? '...' : 'Unlock Sessions'}
+                                     Open Sessions View
                                  </button>
                              </div>
-
-                             {sessionListError && (
-                                 <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-                                     {sessionListError}
-                                 </div>
-                             )}
-
-                             {managedSessions.length > 0 && (
-                                 <div className="mt-4 space-y-3 max-h-80 overflow-y-auto pr-1">
-                                     {managedSessions.map((session) => (
-                                         <div key={session.shortCode} className="border border-gray-100 rounded-xl p-4 bg-gray-50/70">
-                                             <div className="flex items-start justify-between gap-4">
-                                                 <div className="min-w-0">
-                                                     <div className="font-semibold text-gray-800 truncate">{session.title || `Session ${session.shortCode}`}</div>
-                                                     <div className="text-xs text-gray-500 font-mono mt-1">{session.shortCode}</div>
-                                                     {session.remarks && (
-                                                         <div className="text-sm text-gray-600 mt-2 line-clamp-2">{session.remarks}</div>
-                                                     )}
-                                                 </div>
-                                                 <div className="flex items-center gap-2 shrink-0">
-                                                     <button
-                                                         onClick={() => handleLoadConfig(session.shortCode)}
-                                                         disabled={isLoading}
-                                                         className="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg disabled:opacity-50"
-                                                     >
-                                                         Load
-                                                     </button>
-                                                     <button
-                                                         onClick={() => handleDeleteManagedSession(session.shortCode)}
-                                                         className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
-                                                     >
-                                                         Delete
-                                                     </button>
-                                                 </div>
-                                             </div>
-                                             <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                                                 <span className="px-2 py-1 bg-white rounded-full border border-gray-200">{session.subscriptionCount || 0} subscriptions</span>
-                                                 <span className="px-2 py-1 bg-white rounded-full border border-gray-200">{session.proxyNodeCount || 0} proxies</span>
-                                                 <span className="px-2 py-1 bg-white rounded-full border border-gray-200">{session.ruleSetCount || 0} rules</span>
-                                                 <span className="px-2 py-1 bg-white rounded-full border border-gray-200">Updated {formatSessionTimestamp(session.updatedAt || session.createdAt)}</span>
-                                             </div>
-                                         </div>
-                                     ))}
-                                 </div>
-                             )}
-
-                             {sessionAdminKey.trim() && !sessionListError && !isLoadingSessions && managedSessions.length === 0 && (
-                                 <div className="mt-4 p-3 bg-gray-50 text-gray-600 rounded-lg text-sm">
-                                     No indexed sessions yet. Load a session by shortcode after unlocking to add it to this library.
-                                 </div>
-                             )}
                          </div>
                      </div>
                  </div>
