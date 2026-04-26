@@ -4,7 +4,7 @@ import { t, setLanguage } from './i18n/index.js';
 import { generateRules, getOutbounds, PREDEFINED_RULE_SETS } from './config.js';
 
 export class BaseConfigBuilder {
-    constructor(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies = []) {
+    constructor(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies = [], providerRuleSets = []) {
         this.inputString = inputString;
         this.config = DeepCopy(baseConfig);
         this.customRules = [];
@@ -14,6 +14,7 @@ export class BaseConfigBuilder {
         this.userAgent = userAgent;
         // New: Accept pre-fetched subscription proxies
         this.cachedSubscriptionProxies = cachedSubscriptionProxies || [];
+        this.providerRuleSets = providerRuleSets || [];
     }
 
     async build() {
@@ -163,7 +164,33 @@ export class BaseConfigBuilder {
         } else {
             outbounds = getOutbounds(PREDEFINED_RULE_SETS.minimal);
         }
-        return outbounds;
+
+        const providerOutbounds = this.getProviderRuleSetOutbounds();
+        return Array.from(new Set([...outbounds, ...providerOutbounds]));
+    }
+
+    getProviderRuleSetOutbounds() {
+        return Array.from(new Set(
+            (this.providerRuleSets || [])
+                .map(ruleSet => ruleSet?.outbound || ruleSet?.name || ruleSet?.displayName)
+                .filter(Boolean)
+        ));
+    }
+
+    getInlineProviderRules() {
+        return (this.providerRuleSets || []).map(ruleSet => ({
+            site_rules: ruleSet?.rules?.site_rules || [],
+            ip_rules: ruleSet?.rules?.ip_rules || [],
+            domain_suffix: ruleSet?.rules?.domain_suffix || [],
+            domain_keyword: ruleSet?.rules?.domain_keyword || [],
+            ip_cidr: ruleSet?.rules?.ip_cidr || [],
+            protocol: ruleSet?.rules?.protocol || [],
+            outbound: ruleSet?.outbound || ruleSet?.name || ruleSet?.displayName,
+        }));
+    }
+
+    getProviderRemoteSources(ruleSet, client) {
+        return ruleSet?.rules?.remote_sources?.[client] || [];
     }
 
     getProxyList() {

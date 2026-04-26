@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { buildManagedSessionSummary, getManagedSessionSummary, upsertManagedSession } from '../../lib/sessionStore.js';
 
 // Content type mapping
 const CONTENT_TYPES = {
@@ -23,8 +24,9 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { type, config, shortCode, subscriptionIds, standaloneProxies } = await request.json();
+    const { type, config, shortCode, subscriptionIds, proxyNodeIds, standaloneProxies } = await request.json();
     const { env } = getCloudflareContext();
+    let rawConfig = null;
 
     if (!type || !config || !shortCode) {
       return NextResponse.json(
@@ -44,9 +46,10 @@ export async function POST(request) {
       
       if (type === 'raw') {
         // For raw config, store metadata including subscription references
-        const rawConfig = {
+        rawConfig = {
           ...config,
           subscriptionIds: subscriptionIds || [],
+          proxyNodeIds: proxyNodeIds || [],
           standaloneProxies: standaloneProxies || '',
           version: '2.0',
         };
@@ -77,6 +80,16 @@ export async function POST(request) {
 
       await env.SUBMGR_KV.put(configId, configContent);
       console.log('Config stored successfully');
+
+      if (type === 'raw') {
+        const existingSession = await getManagedSessionSummary(env, shortCode);
+        const sessionSummary = buildManagedSessionSummary({
+          shortCode,
+          rawConfig,
+          existingSession,
+        });
+        await upsertManagedSession(env, sessionSummary);
+      }
       
       return NextResponse.json({ 
         success: true, 

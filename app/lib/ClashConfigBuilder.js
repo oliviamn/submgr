@@ -5,11 +5,11 @@ import { DeepCopy } from './utils.js';
 import { t } from './i18n/index.js';
 
 export class ClashConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = []) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = [], providerRuleSets = []) {
         if (!baseConfig) {
             baseConfig = CLASH_CONFIG;
         }
-        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies);
+        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies, providerRuleSets);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
         this.proxyEnabled = proxyEnabled;
@@ -203,6 +203,7 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
 
     formatConfig() {
         const rules = this.generateRules();
+        const providerRules = this.getInlineProviderRules();
         const ruleResults = [];
         
         // 获取.mrs规则集配置
@@ -244,6 +245,43 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
                 ruleResults.push(`IP-CIDR,${cidr},${t('outboundNames.'+ rule.outbound)},no-resolve`);
             });
         });
+
+        const providerRuleProviders = {};
+        providerRules.forEach((rule, index) => {
+            const sourceRuleSet = this.providerRuleSets[index];
+            const remoteSources = this.getProviderRemoteSources(sourceRuleSet, 'clash');
+
+            if (remoteSources.length > 0) {
+                remoteSources.forEach((source, sourceIndex) => {
+                    const providerKey = source.providerKey || `provider-${sourceRuleSet.id || rule.outbound}-${sourceIndex}`;
+                    providerRuleProviders[providerKey] = {
+                        type: 'http',
+                        behavior: source.behavior || 'classical',
+                        format: source.format || 'yaml',
+                        url: source.url,
+                        path: source.path || `./ruleset/${providerKey}.yaml`,
+                        interval: source.interval || 86400,
+                    };
+                    ruleResults.push(`RULE-SET,${providerKey},${t('outboundNames.'+ rule.outbound)}${source.noResolve ? ',no-resolve' : ''}`);
+                });
+                return;
+            }
+
+            rule.domain_suffix?.forEach(suffix => {
+                ruleResults.push(`DOMAIN-SUFFIX,${suffix},${t('outboundNames.'+ rule.outbound)}`);
+            });
+            rule.domain_keyword?.forEach(keyword => {
+                ruleResults.push(`DOMAIN-KEYWORD,${keyword},${t('outboundNames.'+ rule.outbound)}`);
+            });
+            rule.ip_cidr?.forEach(cidr => {
+                ruleResults.push(`IP-CIDR,${cidr},${t('outboundNames.'+ rule.outbound)},no-resolve`);
+            });
+        });
+
+        this.config['rule-providers'] = {
+            ...this.config['rule-providers'],
+            ...providerRuleProviders,
+        };
 
         this.config.rules = [...ruleResults]
 

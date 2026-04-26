@@ -3,13 +3,13 @@ import { SURGE_CONFIG, SURGE_SITE_RULE_SET_BASEURL, SURGE_IP_RULE_SET_BASEURL, g
 import { t } from './i18n/index.js';
 
 export class SurgeConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = []) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = [], providerRuleSets = []) {
         // Not yet implemented, set aside for later use ;)
         // if (!baseConfig) {
         //     baseConfig = SURGE_CONFIG;
         // }
         baseConfig = SURGE_CONFIG;
-        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies);
+        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies, providerRuleSets);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
         this.subscriptionUrl = null;
@@ -192,6 +192,7 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
 
     formatConfig() {
         const rules = generateRules(this.selectedRules, this.customRules);
+        const providerRules = this.getInlineProviderRules();
         let finalConfig = [];
 
         if (this.subscriptionUrl) {
@@ -258,6 +259,28 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
 
         rules.filter(rule => !!rule.ip_cidr).map(rule => {
             rule.ip_cidr.forEach(cidr => {
+                finalConfig.push(`IP-CIDR,${cidr},${t('outboundNames.'+ rule.outbound)},no-resolve`);
+            });
+        });
+
+        providerRules.forEach((rule, index) => {
+            const sourceRuleSet = this.providerRuleSets[index];
+            const remoteSources = this.getProviderRemoteSources(sourceRuleSet, 'surge');
+
+            if (remoteSources.length > 0) {
+                remoteSources.forEach(source => {
+                    finalConfig.push(`RULE-SET,${proxyPrefix}${source.url},${t('outboundNames.'+ rule.outbound)}${source.noResolve ? ',no-resolve' : ''}`);
+                });
+                return;
+            }
+
+            rule.domain_suffix?.forEach(suffix => {
+                finalConfig.push(`DOMAIN-SUFFIX,${suffix},${t('outboundNames.'+ rule.outbound)}`);
+            });
+            rule.domain_keyword?.forEach(keyword => {
+                finalConfig.push(`DOMAIN-KEYWORD,${keyword},${t('outboundNames.'+ rule.outbound)}`);
+            });
+            rule.ip_cidr?.forEach(cidr => {
                 finalConfig.push(`IP-CIDR,${cidr},${t('outboundNames.'+ rule.outbound)},no-resolve`);
             });
         });
