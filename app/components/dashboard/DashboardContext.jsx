@@ -28,9 +28,13 @@ export function DashboardProvider({ children }) {
   const [selectedProviderRuleSetIds, setSelectedProviderRuleSetIds] = useState([]);
   const [proxyNodes, setProxyNodes] = useState([]);
   const [selectedProxyNodeIds, setSelectedProxyNodeIds] = useState([]);
+  const [sessionAdminKey, setSessionAdminKey] = useState('');
+  const [managedSessions, setManagedSessions] = useState([]);
+  const [sessionListError, setSessionListError] = useState(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
   // --- Active View State ---
-  const [activeView, setActiveView] = useState('overview'); // overview, subscriptions, proxies, rules, convert
+  const [activeView, setActiveView] = useState('overview'); // overview, sessions, subscriptions, proxies, rules, convert
 
   const refreshProviderRuleSets = async () => {
     try {
@@ -70,6 +74,325 @@ export function DashboardProvider({ children }) {
     }
   };
 
+  const loadManagedSessions = async (providedKey = sessionAdminKey) => {
+    const normalizedAdminKey = providedKey.trim();
+    if (!normalizedAdminKey) {
+      setSessionListError('Enter the admin key to browse saved sessions.');
+      setManagedSessions([]);
+      return false;
+    }
+
+    try {
+      setIsLoadingSessions(true);
+      const response = await fetch('/api/sessions', {
+        headers: {
+          'x-submgr-admin-key': normalizedAdminKey,
+        },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load saved sessions');
+      }
+
+      setManagedSessions(data.sessions || []);
+      setSessionListError(null);
+      setSessionAdminKey(normalizedAdminKey);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('submgrSessionAdminKey', normalizedAdminKey);
+      }
+      return true;
+    } catch (loadError) {
+      setManagedSessions([]);
+      setSessionListError(loadError.message);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('submgrSessionAdminKey');
+      }
+      return false;
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  const syncSessionIndex = async (shortCode, providedKey = sessionAdminKey) => {
+    const normalizedAdminKey = providedKey.trim();
+    if (!normalizedAdminKey || !shortCode) {
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-submgr-admin-key': normalizedAdminKey,
+        },
+        body: JSON.stringify({ shortCode }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      await loadManagedSessions(normalizedAdminKey);
+      return true;
+    } catch (syncError) {
+      console.warn('Failed to sync session index:', syncError);
+      return false;
+    }
+  };
+
+  const deleteManagedSessionByShortCode = async (shortCode, providedKey = sessionAdminKey) => {
+    const normalizedAdminKey = providedKey.trim();
+    if (!normalizedAdminKey || !shortCode) {
+      return false;
+    }
+
+    const response = await fetch(`/api/sessions/${encodeURIComponent(shortCode)}`, {
+      method: 'DELETE',
+      headers: {
+        'x-submgr-admin-key': normalizedAdminKey,
+      },
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to delete saved session');
+    }
+
+    setManagedSessions((currentSessions) => currentSessions.filter((session) => session.shortCode !== shortCode));
+    setSessionListError(null);
+    return true;
+  };
+
+  const renameManagedSession = async (shortCode, remarksValue, providedKey = sessionAdminKey) => {
+    const normalizedAdminKey = providedKey.trim();
+    const normalizedRemarks = String(remarksValue || '').trim();
+
+    if (!normalizedAdminKey || !shortCode) {
+      return false;
+    }
+
+    const response = await fetch(`/api/sessions/${encodeURIComponent(shortCode)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-submgr-admin-key': normalizedAdminKey,
+      },
+      body: JSON.stringify({
+        remarks: normalizedRemarks,
+      }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to rename saved session');
+    }
+
+    setManagedSessions((currentSessions) => currentSessions.map((session) => (
+      session.shortCode === shortCode ? data.session : session
+    )));
+
+    if (shortCode === shortCodeInput) {
+      setRemarks(normalizedRemarks);
+    }
+
+    setSessionListError(null);
+    return true;
+  };
+
+  const loadConfigByShortCode = async (requestedShortCode = shortCodeInput) => {
+    const resolvedShortCode = typeof requestedShortCode === 'string'
+      ? requestedShortCode
+      : shortCodeInput;
+    const normalizedShortCode = resolvedShortCode.trim();
+
+    if (!normalizedShortCode) {
+      setError('Please enter a short code');
+      return false;
+    }
+
+    try {
+      setIsLoading(true);
+      setShortCodeInput(normalizedShortCode);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('lastShortCode', normalizedShortCode);
+      }
+
+      const response = await fetch(`/api/raw/${normalizedShortCode}`);
+      if (!response.ok) {
+        throw new Error('Failed to load configuration');
+      }
+
+      const config = await response.json();
+      const configData = config.config || config;
+
+      if (config.version === '2.0' || configData.version === '2.0') {
+        if (config.subscriptionIds || configData.subscriptionIds) {
+          const subIds = config.subscriptionIds || configData.subscriptionIds || [];
+          const subResponse = await fetch(`/api/subscription?ids=${encodeURIComponent(subIds.join(','))}`);
+          const subData = await subResponse.json();
+
+          if (subData.success) {
+            const loadedSubs = await Promise.all(
+              (subData.subscriptions || []).map(async (s) => {
+                try {
+                  const fullSubResponse = await fetch(`/api/subscription/${encodeURIComponent(s.subId)}`);
+                  if (fullSubResponse.ok) {
+                    const fullSubData = await fullSubResponse.json();
+                    return {
+                      ...s,
+                      proxies: fullSubData.proxies || [],
+                      enabled: subIds.includes(s.subId),
+                      providerRuleSetIds: fullSubData.providerRuleSetIds || [],
+                      providerRuleSetNames: fullSubData.providerRuleSetNames || [],
+                      providerRuleSetCount: fullSubData.providerRuleSetCount || 0,
+                      providerName: fullSubData.providerName,
+                    };
+                  }
+                } catch (error) {
+                  console.warn('Failed to load full subscription:', s.subId);
+                }
+
+                return { ...s, proxies: [], enabled: subIds.includes(s.subId) };
+              })
+            );
+            setSubscriptions(loadedSubs);
+          }
+        }
+
+        const proxyNodeIds = config.proxyNodeIds || configData.proxyNodeIds || [];
+        if (proxyNodeIds.length > 0) {
+          const proxyResponse = await fetch(`/api/proxies?ids=${encodeURIComponent(proxyNodeIds.join(','))}`);
+          const proxyData = await proxyResponse.json();
+          if (proxyData.success) {
+            setProxyNodes((currentProxyNodes) => {
+              const selectedIds = new Set(proxyNodeIds);
+              const existingMap = new Map(currentProxyNodes.map((proxyNode) => [proxyNode.id, proxyNode]));
+              return (proxyData.proxyNodes || []).map((proxyNode) => ({
+                ...proxyNode,
+                enabled: selectedIds.has(proxyNode.id),
+                rawValue: existingMap.get(proxyNode.id)?.rawValue || proxyNode.rawValue,
+              }));
+            });
+            setSelectedProxyNodeIds(proxyNodeIds);
+          }
+        } else {
+          setSelectedProxyNodeIds([]);
+        }
+
+        const legacyStandaloneProxies = config.standaloneProxies || configData.standaloneProxies || '';
+        if (legacyStandaloneProxies.trim()) {
+          const proxyImportResponse = await fetch('/api/proxies', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: legacyStandaloneProxies,
+            }),
+          });
+
+          const proxyImportData = await proxyImportResponse.json();
+          if (proxyImportData.success) {
+            const importedIds = (proxyImportData.proxyNodes || []).map((proxyNode) => proxyNode.id);
+            setSelectedProxyNodeIds(importedIds);
+            await refreshProxyNodes();
+            setStandaloneProxies('');
+          } else {
+            setStandaloneProxies(legacyStandaloneProxies);
+          }
+        } else {
+          setStandaloneProxies('');
+        }
+      } else {
+        setStandaloneProxies(configData.inputValue || '');
+        setSubscriptions([]);
+      }
+
+      setRemarks(configData.remarks || '');
+      setConfigCreatedTime(configData.configCreatedTime || '');
+
+      if (configData.rules) {
+        setAdvancedOptions(configData.rules.advancedOptions || false);
+        setSelectedRules(configData.rules.selectedRules || []);
+        setSelectedRulePreset(configData.rules.selectedRulePreset || 'custom');
+        let selectedRuleSetIds = configData.rules.selectedProviderRuleSetIds || [];
+        const legacyCustomRules = configData.rules.customRules || [];
+        if (legacyCustomRules.length > 0) {
+          const savedRuleSets = await Promise.all(
+            legacyCustomRules.map(async (rule) => {
+              const response = await fetch('/api/rulesets', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  ruleSet: {
+                    name: rule.name,
+                    outbound: rule.name,
+                    displayName: rule.name,
+                    source: {
+                      kind: 'manual',
+                      providerName: 'Custom',
+                    },
+                    rules: {
+                      site_rules: rule.site ? rule.site.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                      ip_rules: rule.ip ? rule.ip.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                      domain_suffix: rule.domain_suffix ? rule.domain_suffix.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                      domain_keyword: rule.domain_keyword ? rule.domain_keyword.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                      ip_cidr: rule.ip_cidr ? rule.ip_cidr.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                      protocol: rule.protocol ? rule.protocol.split(',').map((value) => value.trim()).filter(Boolean) : [],
+                    },
+                  },
+                }),
+              });
+
+              if (!response.ok) {
+                return null;
+              }
+
+              const data = await response.json();
+              return data.ruleSet;
+            })
+          );
+
+          selectedRuleSetIds = [
+            ...selectedRuleSetIds,
+            ...savedRuleSets.filter(Boolean).map((ruleSet) => ruleSet.id),
+          ];
+          await refreshProviderRuleSets();
+        }
+        setSelectedProviderRuleSetIds(Array.from(new Set(selectedRuleSetIds)));
+        setCustomRules([]);
+        setProxyEnabled(configData.rules.proxyEnabled || false);
+        setProxyUrl(configData.rules.proxyUrl || '');
+      }
+
+      setConvertedConfigs({
+        xray: { type: 'xray' },
+        singbox: { type: 'singbox' },
+        clash: { type: 'clash' },
+        surge: { type: 'surge' },
+      });
+
+      const newShortLinks = {};
+      ['xray', 'singbox', 'clash', 'surge'].forEach((type) => {
+        newShortLinks[type] = `${window.location.origin}/api/${type}/${normalizedShortCode}`;
+      });
+      setShortLinks(newShortLinks);
+
+      await syncSessionIndex(normalizedShortCode);
+      setError(null);
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- Initialization ---
   useEffect(() => {
     // Initialize with Chinese by default (matching original)
@@ -81,6 +404,12 @@ export function DashboardProvider({ children }) {
       const savedShortCode = localStorage.getItem('lastShortCode');
       if (savedShortCode) {
         setShortCodeInput(savedShortCode);
+      }
+
+      const savedAdminKey = window.sessionStorage.getItem('submgrSessionAdminKey');
+      if (savedAdminKey) {
+        setSessionAdminKey(savedAdminKey);
+        loadManagedSessions(savedAdminKey);
       }
     }
 
@@ -148,13 +477,22 @@ export function DashboardProvider({ children }) {
     selectedProviderRuleSetIds, setSelectedProviderRuleSetIds,
     proxyNodes, setProxyNodes,
     selectedProxyNodeIds, setSelectedProxyNodeIds,
+    sessionAdminKey, setSessionAdminKey,
+    managedSessions, setManagedSessions,
+    sessionListError, setSessionListError,
+    isLoadingSessions, setIsLoadingSessions,
     activeView, setActiveView,
 
     // Actions
     handleLanguageChange,
     startNewConfig,
     refreshProviderRuleSets,
-    refreshProxyNodes
+    refreshProxyNodes,
+    loadManagedSessions,
+    syncSessionIndex,
+    loadConfigByShortCode,
+    deleteManagedSessionByShortCode,
+    renameManagedSession
   };
 
   return (

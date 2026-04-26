@@ -13,6 +13,7 @@ export default function DashboardLayout({ children }) {
     const getTitle = () => {
         switch (activeView) {
             case 'overview': return 'Overview';
+            case 'sessions': return 'Sessions';
             case 'subscriptions': return 'Subscriptions';
             case 'proxies': return 'Standalone Proxies';
             case 'rules': return 'Rules & Settings';

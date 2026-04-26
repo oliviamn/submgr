@@ -3,6 +3,7 @@
 import { DashboardProvider, useDashboard } from './DashboardContext';
 import DashboardLayout from './DashboardLayout';
 import Overview from '../views/Overview';
+import SessionsView from '../views/SessionsView';
 import SubscriptionView from '../views/SubscriptionView';
 import ProxyView from '../views/ProxyView';
 import RulesView from '../views/RulesView';
@@ -15,6 +16,8 @@ function DashboardContent() {
         switch (activeView) {
             case 'overview':
                 return <Overview />;
+            case 'sessions':
+                return <SessionsView />;
             case 'subscriptions':
                 return <SubscriptionView />;
             case 'proxies':

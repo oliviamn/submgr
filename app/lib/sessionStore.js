@@ -34,7 +34,7 @@ export function buildManagedSessionSummary({ shortCode, rawConfig, existingSessi
   const selectedProviderRuleSetIds = Array.isArray(rules.selectedProviderRuleSetIds)
     ? rules.selectedProviderRuleSetIds
     : [];
-  const remarks = normalizedConfig.remarks || existingSession?.remarks || '';
+  const remarks = normalizedConfig.remarks ?? existingSession?.remarks ?? '';
   const title = remarks || existingSession?.title || `Session ${shortCode}`;
   const createdAt = existingSession?.createdAt || normalizedConfig.configCreatedTime || rawConfig?.configCreatedTime || now;
 
