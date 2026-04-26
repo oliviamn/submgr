@@ -95,7 +95,7 @@ pnpm install
 
 2. 配置本地环境变量：
    - 复制 `.dev.vars.example` 为 `.dev.vars`
-   - 填入必要的环境变量
+   - 填入必要的环境变量（如 `SUBMGR_ADMIN_KEY`）
 
 3. 启动开发服务器：
 
@@ -136,6 +136,11 @@ pnpm build:kv
 pnpm deploy
 ```
 
+3. 配置生产环境密钥（不要写入 `wrangler.jsonc`）：
+```bash
+wrangler secret put SUBMGR_ADMIN_KEY
+```
+
 或者使用一键部署命令（包含 KV 设置）：
 ```bash
 pnpm cf-deploy
@@ -147,7 +152,12 @@ pnpm cf-deploy
 - Workers 运行时配置
 - KV 存储绑定
 - 资源绑定
-- 环境变量设置
+- 非敏感环境变量设置
+
+敏感信息（例如 `SUBMGR_ADMIN_KEY`）**不要**写入 `wrangler.jsonc`，否则会进入 Git 仓库。推荐做法：
+
+- 本地开发：放在 `.dev.vars`（已被 `.gitignore` 忽略）
+- Cloudflare 生产环境：使用 `wrangler secret put SUBMGR_ADMIN_KEY` 或在 Dashboard 中配置 Secret
 
 ## 开发指南
 
@@ -172,7 +182,8 @@ submgr/
 
 1. 确保在部署前已正确设置所有必要的 Cloudflare 环境变量
 2. 本地开发时使用 `.dev.vars` 文件管理环境变量
-3. 使用 `wrangler dev --local` 可以在本地模拟 Cloudflare Workers 环境
+3. `SUBMGR_ADMIN_KEY` 这类敏感值应使用 Cloudflare Secret，而不是提交到 `wrangler.jsonc`
+4. 使用 `wrangler dev --local` 可以在本地模拟 Cloudflare Workers 环境
 
 ## 技术支持
 
