@@ -441,15 +441,12 @@ export const SING_BOX_CONFIG = {
 			},
 			{
 				type: "fakeip",
-				tag: "dns_fakeip"
+				tag: "dns_fakeip",
+				inet4_range: "198.18.0.0/15",
+				inet6_range: "fc00::/18"
 			}
 		],
 		rules: [
-			{
-				outbound: "any",
-				action: "route",
-				server: "dns_resolver"
-			},
 			{
 				rule_set: "geolocation-!cn",
 				query_type: [
@@ -478,12 +475,7 @@ export const SING_BOX_CONFIG = {
 				rcode: "REFUSED"
 			}
 		],
-		final: "dns_direct",
-		fakeip: {
-			enabled: true,
-			inet4_range: "198.18.0.0/15",
-			inet6_range: "fc00::/18"
-		}
+		final: "dns_direct"
 	},
 	ntp: {
 		enabled: true,
@@ -501,6 +493,9 @@ export const SING_BOX_CONFIG = {
 		{ type: 'block', tag: 'REJECT' }
 	],
 	route: {
+		// Migrated from the legacy `outbound: "any"` DNS rule (deprecated in sing-box 1.12.0).
+		// Resolves domains used by outbounds (e.g. dns.alidns.com) via the direct resolver.
+		default_domain_resolver: "dns_resolver",
 		"rule_set": [
 			{
 				"tag": "geosite-geolocation-!cn",
