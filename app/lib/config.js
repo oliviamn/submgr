@@ -475,8 +475,7 @@ export const SING_BOX_CONFIG = {
 				],
 				invert: true,
 				action: "predefined",
-				rcode: "REFUSED",
-				disable_cache: true
+				rcode: "REFUSED"
 			}
 		],
 		final: "dns_direct",
