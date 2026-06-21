@@ -19,7 +19,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
     }
 
     getProxies() {
-        return this.config.outbounds.filter(outbound => outbound?.server != undefined && outbound?.type != "naive");
+        return this.config.outbounds.filter(outbound => outbound?.server != undefined);
     }
 
     getProxyName(proxy) {
@@ -37,6 +37,11 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
                     delete singboxProxy.tls.insecure;
                 }
                 break;
+            case "naive":
+                singboxProxy = DeepCopy(proxy);
+                delete singboxProxy.local_port;
+                delete singboxProxy.local_exec_path;
+                break;
         
             default:
                 break;
@@ -46,9 +51,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
     }
 
     addProxyToConfig(proxy) {
-        if (proxy.type != "naive") {
-            this.config.outbounds.push(proxy);
-        }
+        this.config.outbounds.push(proxy);
     }
 
     addAutoSelectGroup(proxyList) {

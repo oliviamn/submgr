@@ -338,6 +338,41 @@ export class ProxyParser {
         var exec_path = params.exec || "/usr/local/naive/naive";
         console.log("exec_path", exec_path);
         
+        const tls = {
+          enabled: true,
+          server_name: params.sni || params.host || host
+        };
+        if (params.certificate) tls.certificate = params.certificate;
+        if (params.certificate_path) tls.certificate_path = params.certificate_path;
+        if (params.ech) {
+          try {
+            tls.ech = JSON.parse(decodeURIComponent(params.ech));
+          } catch (e) {
+            tls.ech = params.ech;
+          }
+        }
+
+        const quic = params.quic === 'true' || params.quic === '1' ? true : undefined;
+        const quic_congestion_control = params.quic_congestion_control || params.congestion_control || undefined;
+        const insecure_concurrency = params.insecure_concurrency ? parseInt(params.insecure_concurrency) : undefined;
+
+        let udp_over_tcp = undefined;
+        if (params.udp_over_tcp === 'true' || params.udp_over_tcp === '1') {
+          udp_over_tcp = true;
+        } else if (params.udp_over_tcp) {
+          try {
+            udp_over_tcp = JSON.parse(decodeURIComponent(params.udp_over_tcp));
+          } catch (e) {
+            udp_over_tcp = params.udp_over_tcp;
+          }
+        }
+
+        let extra_headers = undefined;
+        if (params.extra_headers) {
+          try {
+            extra_headers = JSON.parse(decodeURIComponent(params.extra_headers));
+          } catch (e) {}
+        }
     
         return {
           tag: name,
@@ -348,6 +383,12 @@ export class ProxyParser {
           password: decodeURIComponent(password),
           local_port: parseInt(params.localport) || 1080,
           local_exec_path: exec_path,
+          tls: tls,
+          quic: quic,
+          quic_congestion_control: quic_congestion_control,
+          insecure_concurrency: insecure_concurrency,
+          udp_over_tcp: udp_over_tcp,
+          extra_headers: extra_headers,
         };
       }
     }
