@@ -148,7 +148,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         });
 
         this.config.route.rules.unshift(
-            { protocol: 'dns', outbound: 'dns-out' },
+            { protocol: 'dns', action: 'hijack-dns' },
             { clash_mode: 'direct', outbound: 'DIRECT' },
             { clash_mode: 'global', outbound: t('outboundNames.Node Select') }
         );
