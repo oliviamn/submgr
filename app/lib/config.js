@@ -418,40 +418,36 @@ export const SING_BOX_CONFIG = {
 	dns: {
 		servers: [
 			{
+				type: "tcp",
 				tag: "dns_proxy",
-				address: "tcp://1.1.1.1",
-				address_resolver: "dns_resolver",
-				strategy: "ipv4_only",
+				server: "1.1.1.1",
 				detour: "🚀 节点选择"
 			},
 			{
+				type: "https",
 				tag: "dns_direct",
-				address: "https://dns.alidns.com/dns-query",
-				address_resolver: "dns_resolver",
-				strategy: "ipv4_only",
+				server: "dns.alidns.com",
+				server_port: 443,
+				path: "/dns-query",
+				domain_resolver: "dns_resolver",
+				domain_strategy: "ipv4_only",
 				detour: "DIRECT"
 			},
 			{
+				type: "udp",
 				tag: "dns_resolver",
-				address: "223.5.5.5",
+				server: "223.5.5.5",
 				detour: "DIRECT"
 			},
 			{
-				tag: "dns_success",
-				address: "rcode://success"
-			},
-			{
-				tag: "dns_refused",
-				address: "rcode://refused"
-			},
-			{
-				tag: "dns_fakeip",
-				address: "fakeip"
+				type: "fakeip",
+				tag: "dns_fakeip"
 			}
 		],
 		rules: [
 			{
 				outbound: "any",
+				action: "route",
 				server: "dns_resolver"
 			},
 			{
@@ -460,6 +456,7 @@ export const SING_BOX_CONFIG = {
 					"A",
 					"AAAA"
 				],
+				action: "route",
 				server: "dns_fakeip"
 			},
 			{
@@ -467,6 +464,7 @@ export const SING_BOX_CONFIG = {
 				query_type: [
 					"CNAME"
 				],
+				action: "route",
 				server: "dns_proxy"
 			},
 			{
@@ -476,12 +474,12 @@ export const SING_BOX_CONFIG = {
 					"CNAME"
 				],
 				invert: true,
-				server: "dns_refused",
+				action: "predefined",
+				rcode: "REFUSED",
 				disable_cache: true
 			}
 		],
 		final: "dns_direct",
-		independent_cache: true,
 		fakeip: {
 			enabled: true,
 			inet4_range: "198.18.0.0/15",
@@ -497,7 +495,7 @@ export const SING_BOX_CONFIG = {
 	},
 	inbounds: [
 		{ type: 'mixed', tag: 'mixed-in', listen: '0.0.0.0', listen_port: 2080 },
-		{ type: 'tun', tag: 'tun-in', address: '172.19.0.1/30', auto_route: true, strict_route: true, stack: 'mixed', sniff: true }
+		{ type: 'tun', tag: 'tun-in', address: '172.19.0.1/30', auto_route: true, strict_route: true, stack: 'mixed' }
 	],
 	outbounds: [
 		{ type: 'direct', tag: 'DIRECT' },
