@@ -501,8 +501,7 @@ export const SING_BOX_CONFIG = {
 	],
 	outbounds: [
 		{ type: 'direct', tag: 'DIRECT' },
-		{ type: 'block', tag: 'REJECT' },
-		{ type: 'dns', tag: 'dns-out' }
+		{ type: 'block', tag: 'REJECT' }
 	],
 	route: {
 		"rule_set": [
