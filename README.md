@@ -16,6 +16,15 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Local config
+
+For local Cloudflare-style variables, copy `.dev.vars.example` to `.dev.vars` and fill in your own values.
+
+Do **not** commit secrets like `SUBMGR_ADMIN_KEY` to `wrangler.jsonc`. Keep them in:
+
+- `.dev.vars` for local development
+- `wrangler secret put SUBMGR_ADMIN_KEY` or Cloudflare Dashboard secrets for production
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
