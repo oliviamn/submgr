@@ -47,6 +47,17 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
                 break;
         }
 
+        // Clean up database/internal metadata fields for all proxy types to avoid strict parsing errors in sing-box
+        if (singboxProxy && typeof singboxProxy === 'object') {
+            if (singboxProxy === proxy) {
+                singboxProxy = DeepCopy(proxy);
+            }
+            delete singboxProxy.id;
+            delete singboxProxy.rawValue;
+            delete singboxProxy.updatedAt;
+            delete singboxProxy.enabled;
+        }
+
         return singboxProxy;
     }
 
