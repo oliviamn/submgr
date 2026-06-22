@@ -41,6 +41,18 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
                 singboxProxy = DeepCopy(proxy);
                 delete singboxProxy.local_port;
                 delete singboxProxy.local_exec_path;
+                if (!singboxProxy.tls) {
+                    singboxProxy.tls = {
+                        enabled: true,
+                        server_name: singboxProxy.server
+                    };
+                } else {
+                    singboxProxy.tls = DeepCopy(singboxProxy.tls);
+                    singboxProxy.tls.enabled = true;
+                    if (!singboxProxy.tls.server_name) {
+                        singboxProxy.tls.server_name = singboxProxy.server;
+                    }
+                }
                 break;
         
             default:
