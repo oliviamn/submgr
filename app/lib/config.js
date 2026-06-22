@@ -430,14 +430,12 @@ export const SING_BOX_CONFIG = {
 				server_port: 443,
 				path: "/dns-query",
 				domain_resolver: "dns_resolver",
-				domain_strategy: "ipv4_only",
-				detour: "DIRECT"
+				domain_strategy: "ipv4_only"
 			},
 			{
 				type: "udp",
 				tag: "dns_resolver",
-				server: "223.5.5.5",
-				detour: "DIRECT"
+				server: "223.5.5.5"
 			},
 			{
 				type: "fakeip",
@@ -481,8 +479,7 @@ export const SING_BOX_CONFIG = {
 		enabled: true,
 		server: 'time.apple.com',
 		server_port: 123,
-		interval: '30m',
-		detour: 'DIRECT'
+		interval: '30m'
 	},
 	inbounds: [
 		{ type: 'mixed', tag: 'mixed-in', listen: '0.0.0.0', listen_port: 2080 },
