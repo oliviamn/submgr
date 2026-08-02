@@ -80,9 +80,10 @@ function updateWranglerConfig(kvNamespaceId) {
   try {
     let config = fs.readFileSync(WRANGLER_CONFIG_PATH, 'utf8');
     
-    // Parse the JSONC (removing comments first)
+    // Parse the JSONC (removing comments and trailing commas first)
     const configWithoutComments = config.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-    const jsonConfig = JSON.parse(configWithoutComments);
+    const configWithoutTrailingCommas = configWithoutComments.replace(/,(\s*[\]}])/g, '$1');
+    const jsonConfig = JSON.parse(configWithoutTrailingCommas);
     
     // Update or add KV namespace configuration
     jsonConfig.kv_namespaces = [{

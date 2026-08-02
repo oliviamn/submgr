@@ -4,14 +4,14 @@ import { DeepCopy } from './utils.js';
 import { t } from './i18n/index.js';
 
 export class SingboxConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = []) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, proxyEnabled = false, proxyUrl = '', cachedSubscriptionProxies = [], providerRuleSets = []) {
         if (baseConfig === undefined) {
             baseConfig = SING_BOX_CONFIG;
             if (baseConfig.dns && baseConfig.dns.servers) {
                 baseConfig.dns.servers[0].detour = t('outboundNames.Node Select');
             }
         }
-        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies);
+        super(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies, providerRuleSets);
         this.selectedRules = selectedRules;
         this.customRules = customRules;
         this.proxyEnabled = proxyEnabled;
@@ -19,7 +19,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
     }
 
     getProxies() {
-        return this.config.outbounds.filter(outbound => outbound?.server != undefined && outbound?.type != "naive");
+        return this.config.outbounds.filter(outbound => outbound?.server != undefined);
     }
 
     getProxyName(proxy) {
@@ -37,18 +37,44 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
                     delete singboxProxy.tls.insecure;
                 }
                 break;
+            case "naive":
+                singboxProxy = DeepCopy(proxy);
+                delete singboxProxy.local_port;
+                delete singboxProxy.local_exec_path;
+                if (!singboxProxy.tls) {
+                    singboxProxy.tls = {
+                        enabled: true,
+                        server_name: singboxProxy.server
+                    };
+                } else {
+                    singboxProxy.tls = DeepCopy(singboxProxy.tls);
+                    singboxProxy.tls.enabled = true;
+                    if (!singboxProxy.tls.server_name) {
+                        singboxProxy.tls.server_name = singboxProxy.server;
+                    }
+                }
+                break;
         
             default:
                 break;
+        }
+
+        // Clean up database/internal metadata fields for all proxy types to avoid strict parsing errors in sing-box
+        if (singboxProxy && typeof singboxProxy === 'object') {
+            if (singboxProxy === proxy) {
+                singboxProxy = DeepCopy(proxy);
+            }
+            delete singboxProxy.id;
+            delete singboxProxy.rawValue;
+            delete singboxProxy.updatedAt;
+            delete singboxProxy.enabled;
         }
 
         return singboxProxy;
     }
 
     addProxyToConfig(proxy) {
-        if (proxy.type != "naive") {
-            this.config.outbounds.push(proxy);
-        }
+        this.config.outbounds.push(proxy);
     }
 
     addAutoSelectGroup(proxyList) {
@@ -102,11 +128,12 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
 
     formatConfig() {
         const rules = generateRules(this.selectedRules, this.customRules);
+        const providerRules = this.getInlineProviderRules();
         const { site_rule_sets, ip_rule_sets } = generateRuleSets(this.selectedRules, this.customRules, this.proxyEnabled, this.proxyUrl);
 
         this.config.route.rule_set = [...site_rule_sets, ...ip_rule_sets];
 
-        rules.filter(rule => !!rule.domain_suffix || !!rule.domain_keyword).map(rule => {
+        [...rules, ...providerRules].filter(rule => !!rule.domain_suffix || !!rule.domain_keyword).map(rule => {
             this.config.route.rules.push({
                 domain_suffix: rule.domain_suffix,
                 domain_keyword: rule.domain_keyword,
@@ -135,7 +162,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
           });
         });
 
-        rules.filter(rule => !!rule.ip_cidr).map(rule => {
+        [...rules, ...providerRules].filter(rule => !!rule.ip_cidr).map(rule => {
             this.config.route.rules.push({
                 ip_cidr: rule.ip_cidr,
                 protocol: rule.protocol,
@@ -144,7 +171,8 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         });
 
         this.config.route.rules.unshift(
-            { protocol: 'dns', outbound: 'dns-out' },
+            { action: 'sniff' },
+            { protocol: 'dns', action: 'hijack-dns' },
             { clash_mode: 'direct', outbound: 'DIRECT' },
             { clash_mode: 'global', outbound: t('outboundNames.Node Select') }
         );

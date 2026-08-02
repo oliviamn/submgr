@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { ProxyParser } from '../../../lib/ProxyParsers.js';
 import { fetchSubscription } from '../../../lib/subscriptionFetcher.js';
+import { deriveProviderName, extractAndStoreProviderRuleSets, parseSubscriptionProxies } from '../../../lib/subscriptionProcessing.js';
+import { getManagedSubscription, saveManagedSubscription } from '../../../lib/subscriptionStore.js';
 
 // CORS headers
 const corsHeaders = {
@@ -20,26 +21,25 @@ export async function GET(request, { params }) {
     const { subId } = await params;
     const { env } = getCloudflareContext();
 
-    if (!subId || !subId.startsWith('sub_')) {
+    if (!subId || !subId.startsWith('sub')) {
       return NextResponse.json(
         { error: 'Invalid subId' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    const data = await env.SUBMGR_KV.get(subId);
-    if (!data) {
+    const subscription = await getManagedSubscription(env, subId);
+    if (!subscription) {
       return NextResponse.json(
         { error: 'Subscription not found' },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    const parsed = JSON.parse(data);
     return NextResponse.json({
       success: true,
       subId,
-      ...parsed
+      ...subscription
     }, { headers: corsHeaders });
 
   } catch (error) {
@@ -58,7 +58,7 @@ export async function PUT(request, { params }) {
     const { userAgent = 'curl/7.74.0' } = await request.json();
     const { env } = getCloudflareContext();
 
-    if (!subId || !subId.startsWith('sub_')) {
+    if (!subId || !subId.startsWith('sub')) {
       return NextResponse.json(
         { error: 'Invalid subId' },
         { status: 400, headers: corsHeaders }
@@ -66,54 +66,20 @@ export async function PUT(request, { params }) {
     }
 
     // Get existing cached data to retrieve the URL
-    const existingData = await env.SUBMGR_KV.get(subId);
-    if (!existingData) {
+    const parsed = await getManagedSubscription(env, subId);
+    if (!parsed) {
       return NextResponse.json(
         { error: 'Subscription not found in cache' },
         { status: 404, headers: corsHeaders }
       );
     }
-
-    const parsed = JSON.parse(existingData);
     const url = parsed.url;
 
     try {
       // Re-fetch the subscription using the shared fetcher
       console.log('[SubscriptionAPI] Refreshing subscription:', url);
-      const text = await fetchSubscription(url, userAgent);
-
-      // Decode base64 if needed
-      let decodedText;
-      try {
-        decodedText = atob(text.trim());
-        if (decodedText.includes('%')) {
-          decodedText = decodeURIComponent(decodedText);
-        }
-      } catch (e) {
-        decodedText = text;
-        if (decodedText.includes('%')) {
-          try {
-            decodedText = decodeURIComponent(decodedText);
-          } catch (urlError) {
-            console.warn('[SubscriptionAPI] Failed to URL decode:', urlError);
-          }
-        }
-      }
-
-      // Parse proxy URLs
-      const lines = decodedText.split('\n').filter(line => line.trim() !== '');
-      const proxies = [];
-
-      for (const line of lines) {
-        try {
-          const result = await ProxyParser.parse(line, userAgent);
-          if (result && !Array.isArray(result)) {
-            proxies.push(result);
-          }
-        } catch (e) {
-          console.warn('[SubscriptionAPI] Failed to parse line:', line.substring(0, 50));
-        }
-      }
+      const text = await fetchSubscription(url, userAgent, parsed.proxyUrl);
+      const { proxies } = await parseSubscriptionProxies(text, userAgent);
 
       if (proxies.length === 0) {
         return NextResponse.json(
@@ -123,15 +89,35 @@ export async function PUT(request, { params }) {
       }
 
       // Update cache
+      const extractedRuleResult = await extractAndStoreProviderRuleSets({
+        env,
+        url,
+        subscriptionId: subId,
+        proxyUrl: parsed.proxyUrl,
+      });
+
+      const extractedRuleSets = extractedRuleResult.extractedRuleSets?.length > 0
+        ? extractedRuleResult.extractedRuleSets
+        : (parsed.providerRuleSetIds || []).map((id, index) => ({
+            id,
+            name: parsed.providerRuleSetNames?.[index] || id,
+          }));
+
       const cacheData = {
+        subId,
         url,
         proxies,
         fetchedAt: new Date().toISOString(),
         proxyCount: proxies.length,
-        shortCode: parsed.shortCode,
+        userAgent,
+        proxyUrl: parsed.proxyUrl,
+        providerName: parsed.providerName || deriveProviderName(url),
+        providerRuleSetIds: extractedRuleSets.map(ruleSet => ruleSet.id),
+        providerRuleSetNames: extractedRuleSets.map(ruleSet => ruleSet.name),
+        providerRuleSetCount: extractedRuleSets.length,
       };
 
-      await env.SUBMGR_KV.put(subId, JSON.stringify(cacheData));
+      await saveManagedSubscription(env, cacheData);
       console.log('[SubscriptionAPI] Refreshed subscription:', subId, 'with', proxies.length, 'proxies');
 
       return NextResponse.json({
@@ -141,6 +127,9 @@ export async function PUT(request, { params }) {
         proxyCount: proxies.length,
         fetchedAt: cacheData.fetchedAt,
         name: `Subscription (${proxies.length} nodes)`,
+        providerRuleSetCount: cacheData.providerRuleSetCount,
+        providerRuleSetNames: cacheData.providerRuleSetNames,
+        extractedRuleSets,
       }, { headers: corsHeaders });
 
     } catch (fetchError) {
