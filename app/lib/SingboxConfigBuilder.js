@@ -86,7 +86,9 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
     }
 
     addNodeSelectGroup(proxyList) {
-        proxyList.unshift('DIRECT', 'REJECT', t('outboundNames.Auto Select'));
+        // Note: sing-box 1.12 removed the `block` outbound, so REJECT is no longer
+        // offered as a selector option (rejection is a route action in 1.12+).
+        proxyList.unshift('DIRECT', t('outboundNames.Auto Select'));
         this.config.outbounds.unshift({
             type: "selector",
             tag: t('outboundNames.Node Select'),
@@ -133,13 +135,25 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
 
         this.config.route.rule_set = [...site_rule_sets, ...ip_rule_sets];
 
-        [...rules, ...providerRules].filter(rule => !!rule.domain_suffix || !!rule.domain_keyword).map(rule => {
-            this.config.route.rules.push({
-                domain_suffix: rule.domain_suffix,
-                domain_keyword: rule.domain_keyword,
-                protocol: rule.protocol,
-                outbound: t(`outboundNames.${rule.outbound}`)
-            });
+        [...rules, ...providerRules].forEach(rule => {
+            const domainSuffix = (rule.domain_suffix || []).filter(value => value && value.trim() !== '');
+            const domainKeyword = (rule.domain_keyword || []).filter(value => value && value.trim() !== '');
+            // Skip rules with no conditions — they would match ALL traffic.
+            if (domainSuffix.length === 0 && domainKeyword.length === 0) {
+                return;
+            }
+
+            const routeRule = { outbound: t(`outboundNames.${rule.outbound}`) };
+            if (domainSuffix.length > 0) {
+                routeRule.domain_suffix = domainSuffix;
+            }
+            if (domainKeyword.length > 0) {
+                routeRule.domain_keyword = domainKeyword;
+            }
+            if (Array.isArray(rule.protocol) && rule.protocol.length > 0) {
+                routeRule.protocol = rule.protocol;
+            }
+            this.config.route.rules.push(routeRule);
         });
 
         rules.filter(rule => !!rule.site_rules[0]).map(rule => {
@@ -162,12 +176,21 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
           });
         });
 
-        [...rules, ...providerRules].filter(rule => !!rule.ip_cidr).map(rule => {
-            this.config.route.rules.push({
-                ip_cidr: rule.ip_cidr,
-                protocol: rule.protocol,
-                outbound: t(`outboundNames.${rule.outbound}`)
-            });
+        [...rules, ...providerRules].forEach(rule => {
+            const ipCidr = (rule.ip_cidr || []).filter(value => value && value.trim() !== '');
+            // Skip rules with no conditions — they would match ALL traffic.
+            if (ipCidr.length === 0) {
+                return;
+            }
+
+            const routeRule = {
+                ip_cidr: ipCidr,
+                outbound: t(`outboundNames.${rule.outbound}`),
+            };
+            if (Array.isArray(rule.protocol) && rule.protocol.length > 0) {
+                routeRule.protocol = rule.protocol;
+            }
+            this.config.route.rules.push(routeRule);
         });
 
         this.config.route.rules.unshift(

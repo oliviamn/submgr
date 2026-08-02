@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useDashboard } from './DashboardContext';
 import Sidebar from './Sidebar';
-import { t } from '../../lib/i18n';
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
