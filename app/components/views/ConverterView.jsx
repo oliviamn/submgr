@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useDashboard } from '../dashboard/DashboardContext';
 import { t } from '../../lib/i18n';
 import { SingboxConfigBuilder } from '../../lib/SingboxConfigBuilder';
@@ -48,10 +49,15 @@ export default function ConverterView() {
         return enabledProxies;
     };
 
-    const copyToClipboard = async (text) => {
+    const [copiedType, setCopiedType] = useState(null);
+
+    const copyToClipboard = async (text, type) => {
         try {
             await navigator.clipboard.writeText(text);
-            // Could add a toast notification here
+            setCopiedType(type);
+            setTimeout(() => {
+                setCopiedType((current) => (current === type ? null : current));
+            }, 1500);
         } catch (err) {
             console.error('Failed to copy:', err);
         }
@@ -291,10 +297,14 @@ export default function ConverterView() {
                                 />
                                 <div className="absolute right-1 top-1 bottom-1 flex gap-1">
                                     <button
-                                        onClick={() => copyToClipboard(shortLinks[type])}
-                                        className="px-3 bg-white border border-gray-200 text-gray-600 rounded-md hover:bg-gray-50 hover:text-purple-600 transition-colors text-xs font-medium shadow-sm"
+                                        onClick={() => copyToClipboard(shortLinks[type], type)}
+                                        className={`px-3 bg-white border rounded-md transition-colors text-xs font-medium shadow-sm ${
+                                            copiedType === type
+                                                ? 'border-green-300 text-green-600 bg-green-50'
+                                                : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-purple-600'
+                                        }`}
                                     >
-                                        Copy
+                                        {copiedType === type ? 'Copied ✓' : 'Copy'}
                                     </button>
                                 </div>
                             </div>

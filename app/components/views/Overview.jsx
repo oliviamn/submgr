@@ -9,6 +9,7 @@ export default function Overview() {
         subscriptions, setActiveView,
         selectedProviderRuleSetIds,
         selectedProxyNodeIds,
+        apiStatus,
         startNewConfig,
         loadConfigByShortCode
     } = useDashboard();
@@ -151,17 +152,27 @@ export default function Overview() {
 
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-2 h-8 bg-green-500 rounded-full" />
+                        <div className={`w-2 h-8 rounded-full ${
+                            apiStatus === 'online' ? 'bg-green-500' :
+                            apiStatus === 'offline' ? 'bg-red-500' :
+                            'bg-gray-300'
+                        }`} />
                         <h3 className="text-xl font-bold text-gray-800">System Status</h3>
                     </div>
                     <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <span className="text-gray-600 font-medium">API Service</span>
-                            <span className="text-green-600 text-sm font-bold bg-green-100 px-2 py-1 rounded">Operational</span>
+                            <span className={`text-sm font-bold px-2 py-1 rounded ${
+                                apiStatus === 'online' ? 'text-green-600 bg-green-100' :
+                                apiStatus === 'offline' ? 'text-red-600 bg-red-100' :
+                                'text-gray-500 bg-gray-200'
+                            }`}>
+                                {apiStatus === 'online' ? 'Operational' : apiStatus === 'offline' ? 'Unreachable' : 'Checking...'}
+                            </span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <span className="text-gray-600 font-medium">Conversion Engine</span>
-                            <span className="text-green-600 text-sm font-bold bg-green-100 px-2 py-1 rounded">Operational</span>
+                            <span className="text-gray-600 font-medium">Access Control</span>
+                            <span className="text-indigo-600 text-sm font-bold bg-indigo-100 px-2 py-1 rounded">Cloudflare Access</span>
                         </div>
                     </div>
                 </div>

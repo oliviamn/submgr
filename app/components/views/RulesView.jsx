@@ -40,6 +40,7 @@ export default function RulesView() {
         protocol: '',
     });
     const [isSavingRuleSet, setIsSavingRuleSet] = useState(false);
+    const [ruleSetError, setRuleSetError] = useState(null);
 
     // Handle rule preset change
     const handleRulePresetChange = (preset) => {
@@ -138,17 +139,27 @@ export default function RulesView() {
         }
     };
 
-    const deleteRuleSet = async (ruleSetId) => {
-        const response = await fetch(`/api/rulesets/${encodeURIComponent(ruleSetId)}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
+    const deleteRuleSet = async (ruleSet) => {
+        if (typeof window !== 'undefined' && !window.confirm(`Delete rule set "${ruleSet.name || ruleSet.id}"?`)) {
             return;
         }
 
-        setSelectedProviderRuleSetIds((currentIds) => currentIds.filter(id => id !== ruleSetId));
-        await refreshProviderRuleSets();
+        try {
+            setRuleSetError(null);
+            const response = await fetch(`/api/rulesets/${encodeURIComponent(ruleSet.id)}`, {
+                method: 'DELETE',
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete rule set');
+            }
+
+            setSelectedProviderRuleSetIds((currentIds) => currentIds.filter(id => id !== ruleSet.id));
+            await refreshProviderRuleSets();
+        } catch (deleteError) {
+            setRuleSetError(deleteError.message);
+        }
     };
 
     return (
@@ -226,6 +237,12 @@ export default function RulesView() {
                     </button>
                 </div>
 
+                {ruleSetError && (
+                    <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm">
+                        {ruleSetError}
+                    </div>
+                )}
+
                 {providerRuleSets.length === 0 ? (
                     <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6">
                         No saved provider rule sets yet. Add or refresh a subscription to extract them.
@@ -266,7 +283,7 @@ export default function RulesView() {
                                             type="button"
                                             onClick={(event) => {
                                                 event.preventDefault();
-                                                deleteRuleSet(ruleSet.id);
+                                                deleteRuleSet(ruleSet);
                                             }}
                                             className="ml-4 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg"
                                         >

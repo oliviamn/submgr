@@ -31,6 +31,7 @@ export function DashboardProvider({ children }) {
   const [managedSessions, setManagedSessions] = useState([]);
   const [sessionListError, setSessionListError] = useState(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [apiStatus, setApiStatus] = useState('checking'); // checking | online | offline
 
   // --- Active View State ---
   const [activeView, setActiveView] = useState('overview'); // overview, sessions, subscriptions, proxies, rules, convert
@@ -366,6 +367,16 @@ export function DashboardProvider({ children }) {
     }
   };
 
+  const checkApiStatus = async () => {
+    try {
+      const response = await fetch('/api/sessions');
+      setApiStatus(response.ok ? 'online' : 'offline');
+    } catch (statusError) {
+      console.warn('API status check failed:', statusError);
+      setApiStatus('offline');
+    }
+  };
+
   // --- Initialization ---
   useEffect(() => {
     // Initialize with Chinese by default (matching original)
@@ -381,6 +392,7 @@ export function DashboardProvider({ children }) {
     }
 
     loadManagedSessions();
+    checkApiStatus();
     refreshProviderRuleSets();
     refreshProxyNodes();
   }, []);
@@ -448,11 +460,13 @@ export function DashboardProvider({ children }) {
     managedSessions, setManagedSessions,
     sessionListError, setSessionListError,
     isLoadingSessions, setIsLoadingSessions,
+    apiStatus,
     activeView, setActiveView,
 
     // Actions
     handleLanguageChange,
     startNewConfig,
+    checkApiStatus,
     refreshProviderRuleSets,
     refreshProxyNodes,
     loadManagedSessions,
