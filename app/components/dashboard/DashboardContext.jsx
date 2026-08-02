@@ -1,9 +1,25 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { setLanguage, getCurrentLang } from '../../lib/i18n';
 
 const DashboardContext = createContext();
+
+// Views are addressable via URLs; activeView is derived from the pathname so
+// refresh, deep links, and the browser back button all work.
+const VIEW_TO_PATH = {
+  overview: '/',
+  sessions: '/sessions',
+  subscriptions: '/subscriptions',
+  proxies: '/proxies',
+  rules: '/rules',
+  convert: '/convert',
+};
+
+const PATH_TO_VIEW = Object.fromEntries(
+  Object.entries(VIEW_TO_PATH).map(([view, path]) => [path, view])
+);
 
 export function DashboardProvider({ children }) {
   // --- State from SublinkWorker ---
@@ -31,9 +47,18 @@ export function DashboardProvider({ children }) {
   const [managedSessions, setManagedSessions] = useState([]);
   const [sessionListError, setSessionListError] = useState(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [apiStatus, setApiStatus] = useState('checking'); // checking | online | offline
 
-  // --- Active View State ---
-  const [activeView, setActiveView] = useState('overview'); // overview, sessions, subscriptions, proxies, rules, convert
+  // --- Active View (derived from the URL) ---
+  const pathname = usePathname();
+  const router = useRouter();
+  const activeView = PATH_TO_VIEW[pathname] || 'overview';
+  const setActiveView = (view) => {
+    const path = VIEW_TO_PATH[view];
+    if (path && path !== pathname) {
+      router.push(path);
+    }
+  };
 
   const refreshProviderRuleSets = async () => {
     try {
@@ -366,6 +391,16 @@ export function DashboardProvider({ children }) {
     }
   };
 
+  const checkApiStatus = async () => {
+    try {
+      const response = await fetch('/api/sessions');
+      setApiStatus(response.ok ? 'online' : 'offline');
+    } catch (statusError) {
+      console.warn('API status check failed:', statusError);
+      setApiStatus('offline');
+    }
+  };
+
   // --- Initialization ---
   useEffect(() => {
     // Initialize with Chinese by default (matching original)
@@ -381,6 +416,7 @@ export function DashboardProvider({ children }) {
     }
 
     loadManagedSessions();
+    checkApiStatus();
     refreshProviderRuleSets();
     refreshProxyNodes();
   }, []);
@@ -448,11 +484,13 @@ export function DashboardProvider({ children }) {
     managedSessions, setManagedSessions,
     sessionListError, setSessionListError,
     isLoadingSessions, setIsLoadingSessions,
+    apiStatus,
     activeView, setActiveView,
 
     // Actions
     handleLanguageChange,
     startNewConfig,
+    checkApiStatus,
     refreshProviderRuleSets,
     refreshProxyNodes,
     loadManagedSessions,

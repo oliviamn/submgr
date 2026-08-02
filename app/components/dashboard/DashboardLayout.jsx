@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { useDashboard } from './DashboardContext';
 import Sidebar from './Sidebar';
-import { t } from '../../lib/i18n';
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { currentLang, handleLanguageChange, activeView } = useDashboard();
+    const { currentLang, handleLanguageChange, activeView, apiStatus } = useDashboard();
 
     // Get title based on active view
     const getTitle = () => {
@@ -62,10 +61,18 @@ export default function DashboardLayout({ children }) {
                             <option value="zh-CN">中文</option>
                         </select>
 
-                        {/* Connection Status/Indicator (Mock) */}
-                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-medium">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                            Online
+                        {/* Connection Status */}
+                        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+                            apiStatus === 'online' ? 'bg-green-50 text-green-700' :
+                            apiStatus === 'offline' ? 'bg-red-50 text-red-700' :
+                            'bg-gray-100 text-gray-500'
+                        }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                                apiStatus === 'online' ? 'bg-green-500 animate-pulse' :
+                                apiStatus === 'offline' ? 'bg-red-500' :
+                                'bg-gray-400 animate-pulse'
+                            }`} />
+                            {apiStatus === 'online' ? 'Online' : apiStatus === 'offline' ? 'Offline' : 'Checking...'}
                         </div>
                     </div>
                 </header>

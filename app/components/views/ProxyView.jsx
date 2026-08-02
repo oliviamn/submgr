@@ -89,16 +89,26 @@ export default function ProxyView() {
     };
 
     const handleDeleteProxyNode = async (proxyNodeId) => {
-        const response = await fetch(`/api/proxies/${encodeURIComponent(proxyNodeId)}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
+        if (typeof window !== 'undefined' && !window.confirm('Delete this proxy node?')) {
             return;
         }
 
-        setSelectedProxyNodeIds((currentIds) => currentIds.filter(id => id !== proxyNodeId));
-        await refreshProxyNodes();
+        try {
+            setError(null);
+            const response = await fetch(`/api/proxies/${encodeURIComponent(proxyNodeId)}`, {
+                method: 'DELETE',
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete proxy node');
+            }
+
+            setSelectedProxyNodeIds((currentIds) => currentIds.filter(id => id !== proxyNodeId));
+            await refreshProxyNodes();
+        } catch (deleteError) {
+            setError(deleteError.message);
+        }
     };
 
     return (

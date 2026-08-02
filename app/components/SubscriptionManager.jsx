@@ -17,6 +17,8 @@ export default function SubscriptionManager({
   const [fetchProxyUrl, setFetchProxyUrl] = useState('');
   const [fetchUserAgent, setFetchUserAgent] = useState(userAgent);
   const [showFetchSettings, setShowFetchSettings] = useState(false);
+  const [refreshingSubId, setRefreshingSubId] = useState(null);
+  const [deletingSubId, setDeletingSubId] = useState(null);
 
   // Load globally managed subscriptions on mount
   useEffect(() => {
@@ -124,6 +126,7 @@ export default function SubscriptionManager({
   };
 
   const handleRefreshSubscription = async (sub) => {
+    setRefreshingSubId(sub.subId);
     try {
       const response = await fetch(`/api/subscription/${encodeURIComponent(sub.subId)}`, {
         method: 'PUT',
@@ -164,10 +167,17 @@ export default function SubscriptionManager({
     } catch (err) {
       setError(err.message);
       console.error('Refresh subscription error:', err);
+    } finally {
+      setRefreshingSubId(null);
     }
   };
 
   const handleDeleteSubscription = async (sub) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Delete subscription "${sub.name || sub.subId}"?`)) {
+      return;
+    }
+
+    setDeletingSubId(sub.subId);
     try {
       const response = await fetch(`/api/subscription?subId=${encodeURIComponent(sub.subId)}`, {
         method: 'DELETE'
@@ -183,6 +193,8 @@ export default function SubscriptionManager({
     } catch (err) {
       setError(err.message);
       console.error('Delete subscription error:', err);
+    } finally {
+      setDeletingSubId(null);
     }
   };
 
@@ -316,21 +328,30 @@ export default function SubscriptionManager({
               <div className="flex items-center gap-1 ml-2">
                 <button
                   onClick={() => handleRefreshSubscription(sub)}
+                  disabled={refreshingSubId === sub.subId || deletingSubId === sub.subId}
                   title="Refresh subscription"
-                  className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded"
+                  className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-4 h-4 ${refreshingSubId === sub.subId ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
                 <button
                   onClick={() => handleDeleteSubscription(sub)}
+                  disabled={refreshingSubId === sub.subId || deletingSubId === sub.subId}
                   title="Delete cached subscription"
-                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  {deletingSubId === sub.subId ? (
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
