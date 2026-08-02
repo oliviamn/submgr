@@ -486,7 +486,8 @@ export const SING_BOX_CONFIG = {
 		{ type: 'tun', tag: 'tun-in', address: '172.19.0.1/30', auto_route: true, strict_route: true, stack: 'mixed' }
 	],
 	outbounds: [
-		{ type: 'direct', tag: 'DIRECT' }
+		{ type: 'direct', tag: 'DIRECT' },
+		{ type: 'block', tag: 'REJECT' }
 	],
 	route: {
 		// Migrated from the legacy `outbound: "any"` DNS rule (deprecated in sing-box 1.12.0).

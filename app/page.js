@@ -1,5 +1,7 @@
-import Overview from './components/views/Overview';
+import DashboardApp from './components/dashboard/DashboardApp';
 
 export default function Home() {
-  return <Overview />;
+  return (
+    <DashboardApp />
+  );
 }
