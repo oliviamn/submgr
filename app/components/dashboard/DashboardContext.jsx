@@ -1,25 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
 import { setLanguage, getCurrentLang } from '../../lib/i18n';
 
 const DashboardContext = createContext();
-
-// Views are addressable via URLs; activeView is derived from the pathname so
-// refresh, deep links, and the browser back button all work.
-const VIEW_TO_PATH = {
-  overview: '/',
-  sessions: '/sessions',
-  subscriptions: '/subscriptions',
-  proxies: '/proxies',
-  rules: '/rules',
-  convert: '/convert',
-};
-
-const PATH_TO_VIEW = Object.fromEntries(
-  Object.entries(VIEW_TO_PATH).map(([view, path]) => [path, view])
-);
 
 export function DashboardProvider({ children }) {
   // --- State from SublinkWorker ---
@@ -49,16 +33,8 @@ export function DashboardProvider({ children }) {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [apiStatus, setApiStatus] = useState('checking'); // checking | online | offline
 
-  // --- Active View (derived from the URL) ---
-  const pathname = usePathname();
-  const router = useRouter();
-  const activeView = PATH_TO_VIEW[pathname] || 'overview';
-  const setActiveView = (view) => {
-    const path = VIEW_TO_PATH[view];
-    if (path && path !== pathname) {
-      router.push(path);
-    }
-  };
+  // --- Active View State ---
+  const [activeView, setActiveView] = useState('overview'); // overview, sessions, subscriptions, proxies, rules, convert
 
   const refreshProviderRuleSets = async () => {
     try {

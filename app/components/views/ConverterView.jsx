@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import QRCode from 'qrcode';
 import { useDashboard } from '../dashboard/DashboardContext';
+import { t } from '../../lib/i18n';
 import { SingboxConfigBuilder } from '../../lib/SingboxConfigBuilder';
 import { ClashConfigBuilder } from '../../lib/ClashConfigBuilder';
 import { SurgeConfigBuilder } from '../../lib/SurgeConfigBuilder';
@@ -50,26 +50,6 @@ export default function ConverterView() {
     };
 
     const [copiedType, setCopiedType] = useState(null);
-    const [qrType, setQrType] = useState(null);
-    const [qrImages, setQrImages] = useState({});
-
-    const toggleQrCode = async (type) => {
-        if (qrType === type) {
-            setQrType(null);
-            return;
-        }
-
-        if (!qrImages[type]) {
-            try {
-                const dataUrl = await QRCode.toDataURL(shortLinks[type], { width: 256, margin: 2 });
-                setQrImages((current) => ({ ...current, [type]: dataUrl }));
-            } catch (qrError) {
-                console.error('Failed to generate QR code:', qrError);
-                return;
-            }
-        }
-        setQrType(type);
-    };
 
     const copyToClipboard = async (text, type) => {
         try {
@@ -338,23 +318,8 @@ export default function ConverterView() {
                                 >
                                     Open Link
                                 </a>
-                                <button
-                                    onClick={() => toggleQrCode(type)}
-                                    className={`px-4 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
-                                        qrType === type
-                                            ? 'bg-purple-50 border-purple-200 text-purple-700'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    QR
-                                </button>
+                                {/* QR Code button could go here */}
                             </div>
-
-                            {qrType === type && qrImages[type] && (
-                                <div className="mt-4 flex justify-center p-4 bg-gray-50 border border-gray-100 rounded-xl">
-                                    <img src={qrImages[type]} alt={`${type} subscription QR code`} className="w-48 h-48" />
-                                </div>
-                            )}
                         </div>
                     ))}
                 </div>
