@@ -3,5 +3,7 @@
 
 interface CloudflareEnv {
     SUBMGR_KV: KVNamespace;
-    SUBMGR_ADMIN_KEY?: string;
+    PROXY_URL?: string;
+    CF_ACCESS_TEAM_DOMAIN?: string;
+    CF_ACCESS_AUD?: string;
 }

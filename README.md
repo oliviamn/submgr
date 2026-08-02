@@ -20,10 +20,25 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 For local Cloudflare-style variables, copy `.dev.vars.example` to `.dev.vars` and fill in your own values.
 
-Do **not** commit secrets like `SUBMGR_ADMIN_KEY` to `wrangler.jsonc`. Keep them in:
+Do **not** commit secrets to `wrangler.jsonc`. Keep them in:
 
 - `.dev.vars` for local development
-- `wrangler secret put SUBMGR_ADMIN_KEY` or Cloudflare Dashboard secrets for production
+- `wrangler secret put <NAME>` or Cloudflare Dashboard secrets for production
+
+## Authentication (Cloudflare Access)
+
+The dashboard and all management APIs are protected by [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-public-hostname/) (OAuth at the edge, e.g. Google or GitHub login). Only the client-facing config fetch endpoints (`GET /api/{xray|singbox|clash|surge|raw}/{shortcode}`) are public.
+
+Setup:
+
+1. In the Cloudflare Zero Trust dashboard, create an Access **self-hosted application** covering your app's hostname (and the `workers.dev` URL if you use it).
+2. Configure an identity provider (Google, GitHub, ...) and a policy allowing your email(s).
+3. Copy your **team domain** (`<team>.cloudflareaccess.com`) and the application's **AUD tag**.
+4. Set them on the Worker (non-secret vars are fine, secrets also work):
+   - `CF_ACCESS_TEAM_DOMAIN`
+   - `CF_ACCESS_AUD`
+
+The Worker also verifies the Access JWT in `middleware.ts`, so requests that bypass Access (e.g. direct `workers.dev` hits) are rejected with 401. If these variables are unset (local development), auth is bypassed with a warning.
 
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 

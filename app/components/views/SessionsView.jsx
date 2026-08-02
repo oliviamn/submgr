@@ -5,7 +5,6 @@ import { useDashboard } from '../dashboard/DashboardContext';
 
 export default function SessionsView() {
     const {
-        sessionAdminKey, setSessionAdminKey,
         managedSessions,
         sessionListError, setSessionListError,
         isLoadingSessions,
@@ -89,31 +88,20 @@ export default function SessionsView() {
                     <div>
                         <div className="flex items-center gap-3 mb-3">
                             <h2 className="text-2xl font-bold text-gray-800">Saved Sessions</h2>
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Protected</span>
                         </div>
                         <p className="text-gray-500 max-w-2xl">
-                            Unlock the protected session library to browse, rename, search, load, and delete saved sessions.
+                            Browse, rename, search, load, and delete saved sessions.
                         </p>
                     </div>
 
                     <div className="w-full lg:max-w-xl space-y-3">
                         <div className="flex flex-col sm:flex-row gap-3">
-                            <input
-                                type="password"
-                                placeholder="Admin key"
-                                value={sessionAdminKey}
-                                onChange={(e) => {
-                                    setSessionAdminKey(e.target.value);
-                                    setSessionListError(null);
-                                }}
-                                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                            />
                             <button
                                 onClick={() => loadManagedSessions()}
                                 disabled={isLoadingSessions}
                                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
-                                {isLoadingSessions ? 'Unlocking...' : 'Unlock Sessions'}
+                                {isLoadingSessions ? 'Refreshing...' : 'Refresh Sessions'}
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs text-gray-500">
@@ -153,7 +141,7 @@ export default function SessionsView() {
 
                 {managedSessions.length === 0 ? (
                     <div className="p-6 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500">
-                        Unlock the session library to see saved sessions. Older shortcode-only sessions are added here automatically after you load them once.
+                        No saved sessions yet. Older shortcode-only sessions are added here automatically after you load them once.
                     </div>
                 ) : filteredSessions.length === 0 ? (
                     <div className="p-6 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500">

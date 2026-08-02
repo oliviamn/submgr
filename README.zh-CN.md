@@ -95,7 +95,7 @@ pnpm install
 
 2. 配置本地环境变量：
    - 复制 `.dev.vars.example` 为 `.dev.vars`
-   - 填入必要的环境变量（如 `SUBMGR_ADMIN_KEY`）
+   - 填入必要的环境变量（如 `PROXY_URL`、`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD`，本地开发可留空后两者以跳过鉴权）
 
 3. 启动开发服务器：
 
@@ -136,10 +136,7 @@ pnpm build:kv
 pnpm deploy
 ```
 
-3. 配置生产环境密钥（不要写入 `wrangler.jsonc`）：
-```bash
-wrangler secret put SUBMGR_ADMIN_KEY
-```
+3. 配置 Cloudflare Access（OAuth 登录，见下文「访问控制」）及环境变量 `CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD`（非敏感，可写入 `wrangler.jsonc` 的 `vars` 或使用 Secret）。
 
 或者使用一键部署命令（包含 KV 设置）：
 ```bash
@@ -154,10 +151,25 @@ pnpm cf-deploy
 - 资源绑定
 - 非敏感环境变量设置
 
-敏感信息（例如 `SUBMGR_ADMIN_KEY`）**不要**写入 `wrangler.jsonc`，否则会进入 Git 仓库。推荐做法：
+敏感信息**不要**写入 `wrangler.jsonc`，否则会进入 Git 仓库。推荐做法：
 
 - 本地开发：放在 `.dev.vars`（已被 `.gitignore` 忽略）
-- Cloudflare 生产环境：使用 `wrangler secret put SUBMGR_ADMIN_KEY` 或在 Dashboard 中配置 Secret
+- Cloudflare 生产环境：使用 `wrangler secret put <NAME>` 或在 Dashboard 中配置 Secret
+
+## 访问控制（Cloudflare Access）
+
+管理后台及所有管理 API 均通过 [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-public-hostname/) 进行 OAuth 登录保护（如 Google、GitHub 账号）。仅客户端拉取配置的短链接端点（`GET /api/{xray|singbox|clash|surge|raw}/{shortcode}`）保持公开。
+
+配置步骤：
+
+1. 在 Cloudflare Zero Trust 控制台创建一个 Access **self-hosted application**，覆盖你的应用域名（如使用 `workers.dev` 地址，也一并覆盖）。
+2. 配置身份提供商（Google、GitHub 等），并添加允许访问的策略（如你的邮箱）。
+3. 复制你的 **team domain**（`<team>.cloudflareaccess.com`）和应用的 **AUD tag**。
+4. 在 Worker 上设置环境变量（非敏感，可用 vars 或 Secret）：
+   - `CF_ACCESS_TEAM_DOMAIN`
+   - `CF_ACCESS_AUD`
+
+Worker 会在 `middleware.ts` 中校验 Access JWT，因此绕过 Access 直接访问（例如直接请求 `workers.dev`）会返回 401。本地开发未配置这两个变量时，鉴权会自动跳过并输出警告。
 
 ## 开发指南
 
@@ -182,7 +194,7 @@ submgr/
 
 1. 确保在部署前已正确设置所有必要的 Cloudflare 环境变量
 2. 本地开发时使用 `.dev.vars` 文件管理环境变量
-3. `SUBMGR_ADMIN_KEY` 这类敏感值应使用 Cloudflare Secret，而不是提交到 `wrangler.jsonc`
+3. 敏感值应使用 Cloudflare Secret，而不是提交到 `wrangler.jsonc`
 4. 使用 `wrangler dev --local` 可以在本地模拟 Cloudflare Workers 环境
 
 ## 技术支持
