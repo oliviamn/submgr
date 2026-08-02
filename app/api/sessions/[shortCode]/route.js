@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { SESSION_ADMIN_HEADER, validateSessionAdminRequest } from '../../../lib/sessionAdmin.js';
 import { buildManagedSessionSummary, deleteManagedSession, getManagedSessionSummary, importManagedSessionFromShortCode, upsertManagedSession } from '../../../lib/sessionStore.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': `Content-Type, ${SESSION_ADMIN_HEADER}`,
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 function withCors(response, init = {}) {
@@ -26,10 +25,6 @@ export async function OPTIONS() {
 export async function GET(request, { params }) {
   try {
     const { env } = getCloudflareContext();
-    const auth = validateSessionAdminRequest(request, env);
-    if (!auth.ok) {
-      return withCors({ error: auth.error }, { status: auth.status });
-    }
 
     const { shortCode } = await params;
     const session = await getManagedSessionSummary(env, shortCode) || await importManagedSessionFromShortCode(env, shortCode);
@@ -52,10 +47,6 @@ export async function GET(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { env } = getCloudflareContext();
-    const auth = validateSessionAdminRequest(request, env);
-    if (!auth.ok) {
-      return withCors({ error: auth.error }, { status: auth.status });
-    }
 
     const { shortCode } = await params;
     await deleteManagedSession(env, shortCode);
@@ -75,10 +66,6 @@ export async function DELETE(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { env } = getCloudflareContext();
-    const auth = validateSessionAdminRequest(request, env);
-    if (!auth.ok) {
-      return withCors({ error: auth.error }, { status: auth.status });
-    }
 
     const { shortCode } = await params;
     const payload = await request.json();

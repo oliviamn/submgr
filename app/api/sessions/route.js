@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { SESSION_ADMIN_HEADER, validateSessionAdminRequest } from '../../lib/sessionAdmin.js';
 import { importManagedSessionFromShortCode, listManagedSessions } from '../../lib/sessionStore.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': `Content-Type, ${SESSION_ADMIN_HEADER}`,
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 function withCors(response, init = {}) {
@@ -26,10 +25,6 @@ export async function OPTIONS() {
 export async function GET(request) {
   try {
     const { env } = getCloudflareContext();
-    const auth = validateSessionAdminRequest(request, env);
-    if (!auth.ok) {
-      return withCors({ error: auth.error }, { status: auth.status });
-    }
 
     const sessions = await listManagedSessions(env);
     return withCors({
@@ -48,10 +43,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { env } = getCloudflareContext();
-    const auth = validateSessionAdminRequest(request, env);
-    if (!auth.ok) {
-      return withCors({ error: auth.error }, { status: auth.status });
-    }
 
     const { shortCode } = await request.json();
     if (!shortCode) {

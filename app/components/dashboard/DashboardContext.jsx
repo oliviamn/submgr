@@ -28,7 +28,6 @@ export function DashboardProvider({ children }) {
   const [selectedProviderRuleSetIds, setSelectedProviderRuleSetIds] = useState([]);
   const [proxyNodes, setProxyNodes] = useState([]);
   const [selectedProxyNodeIds, setSelectedProxyNodeIds] = useState([]);
-  const [sessionAdminKey, setSessionAdminKey] = useState('');
   const [managedSessions, setManagedSessions] = useState([]);
   const [sessionListError, setSessionListError] = useState(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
@@ -74,21 +73,10 @@ export function DashboardProvider({ children }) {
     }
   };
 
-  const loadManagedSessions = async (providedKey = sessionAdminKey) => {
-    const normalizedAdminKey = providedKey.trim();
-    if (!normalizedAdminKey) {
-      setSessionListError('Enter the admin key to browse saved sessions.');
-      setManagedSessions([]);
-      return false;
-    }
-
+  const loadManagedSessions = async () => {
     try {
       setIsLoadingSessions(true);
-      const response = await fetch('/api/sessions', {
-        headers: {
-          'x-submgr-admin-key': normalizedAdminKey,
-        },
-      });
+      const response = await fetch('/api/sessions');
       const data = await response.json();
 
       if (!response.ok) {
@@ -97,26 +85,18 @@ export function DashboardProvider({ children }) {
 
       setManagedSessions(data.sessions || []);
       setSessionListError(null);
-      setSessionAdminKey(normalizedAdminKey);
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('submgrSessionAdminKey', normalizedAdminKey);
-      }
       return true;
     } catch (loadError) {
       setManagedSessions([]);
       setSessionListError(loadError.message);
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.removeItem('submgrSessionAdminKey');
-      }
       return false;
     } finally {
       setIsLoadingSessions(false);
     }
   };
 
-  const syncSessionIndex = async (shortCode, providedKey = sessionAdminKey) => {
-    const normalizedAdminKey = providedKey.trim();
-    if (!normalizedAdminKey || !shortCode) {
+  const syncSessionIndex = async (shortCode) => {
+    if (!shortCode) {
       return false;
     }
 
@@ -125,7 +105,6 @@ export function DashboardProvider({ children }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-submgr-admin-key': normalizedAdminKey,
         },
         body: JSON.stringify({ shortCode }),
       });
@@ -134,7 +113,7 @@ export function DashboardProvider({ children }) {
         return false;
       }
 
-      await loadManagedSessions(normalizedAdminKey);
+      await loadManagedSessions();
       return true;
     } catch (syncError) {
       console.warn('Failed to sync session index:', syncError);
@@ -142,17 +121,13 @@ export function DashboardProvider({ children }) {
     }
   };
 
-  const deleteManagedSessionByShortCode = async (shortCode, providedKey = sessionAdminKey) => {
-    const normalizedAdminKey = providedKey.trim();
-    if (!normalizedAdminKey || !shortCode) {
+  const deleteManagedSessionByShortCode = async (shortCode) => {
+    if (!shortCode) {
       return false;
     }
 
     const response = await fetch(`/api/sessions/${encodeURIComponent(shortCode)}`, {
       method: 'DELETE',
-      headers: {
-        'x-submgr-admin-key': normalizedAdminKey,
-      },
     });
     const data = await response.json();
 
@@ -165,11 +140,10 @@ export function DashboardProvider({ children }) {
     return true;
   };
 
-  const renameManagedSession = async (shortCode, remarksValue, providedKey = sessionAdminKey) => {
-    const normalizedAdminKey = providedKey.trim();
+  const renameManagedSession = async (shortCode, remarksValue) => {
     const normalizedRemarks = String(remarksValue || '').trim();
 
-    if (!normalizedAdminKey || !shortCode) {
+    if (!shortCode) {
       return false;
     }
 
@@ -177,7 +151,6 @@ export function DashboardProvider({ children }) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'x-submgr-admin-key': normalizedAdminKey,
       },
       body: JSON.stringify({
         remarks: normalizedRemarks,
@@ -405,14 +378,9 @@ export function DashboardProvider({ children }) {
       if (savedShortCode) {
         setShortCodeInput(savedShortCode);
       }
-
-      const savedAdminKey = window.sessionStorage.getItem('submgrSessionAdminKey');
-      if (savedAdminKey) {
-        setSessionAdminKey(savedAdminKey);
-        loadManagedSessions(savedAdminKey);
-      }
     }
 
+    loadManagedSessions();
     refreshProviderRuleSets();
     refreshProxyNodes();
   }, []);
@@ -477,7 +445,6 @@ export function DashboardProvider({ children }) {
     selectedProviderRuleSetIds, setSelectedProviderRuleSetIds,
     proxyNodes, setProxyNodes,
     selectedProxyNodeIds, setSelectedProxyNodeIds,
-    sessionAdminKey, setSessionAdminKey,
     managedSessions, setManagedSessions,
     sessionListError, setSessionListError,
     isLoadingSessions, setIsLoadingSessions,

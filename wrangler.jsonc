@@ -40,9 +40,11 @@
 	 */
 	// "vars": { "MY_VARIABLE": "production_value" },
 	/**
-	 * Note: Use secrets to store sensitive data such as SUBMGR_ADMIN_KEY.
+	 * Note: Use secrets to store sensitive values.
 	 * Local development should use `.dev.vars` (gitignored).
-	 * Production should use `wrangler secret put SUBMGR_ADMIN_KEY` or a dashboard secret.
+	 * Production should use `wrangler secret put <NAME>` or dashboard secrets.
+	 * Auth is handled by Cloudflare Access; set CF_ACCESS_TEAM_DOMAIN and
+	 * CF_ACCESS_AUD (non-secret vars or secrets) to enable JWT verification.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
 	/**
