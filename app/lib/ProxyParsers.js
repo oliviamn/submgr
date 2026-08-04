@@ -91,7 +91,10 @@ export class ProxyParser {
             let base64 = url.replace('vmess://', '')
             let vmessConfig = JSON.parse(decodeBase64(base64))
             let tls = { "enabled": false }
-            let transport = {}
+            // Only emit a transport when the node uses one — sing-box rejects an
+            // empty `transport: {}` (unknown transport type) and a bare vmess
+            // node has no transport at all.
+            let transport
             if (vmessConfig.net === 'ws') {
                 transport = {
                     "type": "ws",
@@ -227,7 +230,6 @@ export class ProxyParser {
             password: decodeURIComponent(userinfo.split(':')[1]),
             congestion_control: params.congestion_control,
             tls: tls,
-            flow: params.flow ?? undefined
           };
         }
       }
@@ -254,7 +256,6 @@ export class ProxyParser {
             password: decodeURIComponent(userinfo.split(':')[1]),
             congestion_control: params.congestion_control,
             tls: tls,
-            flow: params.flow ?? undefined
           };
         }
       }
