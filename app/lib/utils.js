@@ -130,14 +130,25 @@ export function parseServerInfo(serverInfo) {
   
   export function parseUrlParams(url) {
 	const [, rest] = url.split('://');
-	const [addressPart, ...remainingParts] = rest.split('?');
+	let [addressPart, ...remainingParts] = rest.split('?');
 	const paramsPart = remainingParts.join('?');
-  
-	const [paramsOnly, ...fragmentParts] = paramsPart.split('#');
-	const searchParams = new URLSearchParams(paramsOnly);
-	const params = Object.fromEntries(searchParams.entries());
 
-	let name = fragmentParts.length > 0 ? fragmentParts.join('#') : '';
+	let params = {};
+	let name = '';
+	if (paramsPart !== '') {
+		const [paramsOnly, ...fragmentParts] = paramsPart.split('#');
+		params = Object.fromEntries(new URLSearchParams(paramsOnly).entries());
+		name = fragmentParts.length > 0 ? fragmentParts.join('#') : '';
+	} else {
+		// No query string: the fragment directly follows the address part,
+		// e.g. vless://uuid@host:443#MyNode
+		const [addr, ...fragmentParts] = addressPart.split('#');
+		if (fragmentParts.length > 0) {
+			addressPart = addr;
+			name = fragmentParts.join('#');
+		}
+	}
+
 	try {
 	    name = decodeURIComponent(name);
 	} catch (error) { };
@@ -169,10 +180,27 @@ export function parseServerInfo(serverInfo) {
   }
   
   export function createTransportConfig(params) {
-	return {
-	  type: params.type,
-	  path: params.path ?? undefined,
-	  ...(params.host && { 'headers': { 'host': params.host } }),
-	  service_name: params.serviceName ?? undefined,
-	};
+	const type = params.type;
+	if (!type || type === 'tcp') {
+		// No transport: sing-box rejects an empty `transport: {}` object, so it
+		// must be omitted entirely rather than emitted empty.
+		return undefined;
+	}
+	const transport = { type };
+	if (type === 'grpc') {
+		// gRPC transport only supports service_name; `path` and `headers` are
+		// unknown fields for it and would fail sing-box strict parsing.
+		if (params.serviceName) {
+			transport.service_name = params.serviceName;
+		}
+		return transport;
+	}
+	// http / ws / httpupgrade support path and headers
+	if (params.path) {
+		transport.path = params.path;
+	}
+	if (params.host) {
+		transport.headers = { 'host': params.host };
+	}
+	return transport;
   }
