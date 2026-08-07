@@ -17,6 +17,49 @@ const AVAILABLE_RULES = [
     'Gaming', 'Education', 'Financial', 'Cloud Services', 'Non-China'
 ];
 
+const RULE_SET_FIELDS = ['site', 'ip', 'domain_suffix', 'domain_keyword', 'ip_cidr', 'protocol'];
+
+const EMPTY_RULE_SET_DRAFT = {
+    name: '',
+    site: '',
+    ip: '',
+    domain_suffix: '',
+    domain_keyword: '',
+    ip_cidr: '',
+    protocol: '',
+};
+
+const splitRuleValues = (value) => (
+    value ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+);
+
+const draftToRuleSetPayload = (draft) => ({
+    name: draft.name.trim(),
+    displayName: draft.name.trim(),
+    rules: {
+        site_rules: splitRuleValues(draft.site),
+        ip_rules: splitRuleValues(draft.ip),
+        domain_suffix: splitRuleValues(draft.domain_suffix),
+        domain_keyword: splitRuleValues(draft.domain_keyword),
+        ip_cidr: splitRuleValues(draft.ip_cidr),
+        protocol: splitRuleValues(draft.protocol),
+    },
+});
+
+const ruleSetToDraft = (ruleSet) => ({
+    name: ruleSet.name || '',
+    site: (ruleSet.rules?.site_rules || []).join(', '),
+    ip: (ruleSet.rules?.ip_rules || []).join(', '),
+    domain_suffix: (ruleSet.rules?.domain_suffix || []).join(', '),
+    domain_keyword: (ruleSet.rules?.domain_keyword || []).join(', '),
+    ip_cidr: (ruleSet.rules?.ip_cidr || []).join(', '),
+    protocol: (ruleSet.rules?.protocol || []).join(', '),
+});
+
+const ruleFieldLabel = (field) => (
+    t(`customRule${field.replace('ip', 'IP').replace('cidr', 'CIDR').replace(/_([a-z])/g, (g) => g[1].toUpperCase()).replace(/^([a-z])/, (g) => g.toUpperCase())}`) || field.replace('_', ' ')
+);
+
 export default function RulesView() {
     const {
         advancedOptions, setAdvancedOptions,
@@ -30,17 +73,12 @@ export default function RulesView() {
         setSelectedProviderRuleSetIds,
         refreshProviderRuleSets
     } = useDashboard();
-    const [draftRuleSet, setDraftRuleSet] = useState({
-        name: '',
-        site: '',
-        ip: '',
-        domain_suffix: '',
-        domain_keyword: '',
-        ip_cidr: '',
-        protocol: '',
-    });
+    const [draftRuleSet, setDraftRuleSet] = useState(EMPTY_RULE_SET_DRAFT);
     const [isSavingRuleSet, setIsSavingRuleSet] = useState(false);
     const [ruleSetError, setRuleSetError] = useState(null);
+    const [editingRuleSetId, setEditingRuleSetId] = useState(null);
+    const [editDraftRuleSet, setEditDraftRuleSet] = useState(null);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     // Handle rule preset change
     const handleRulePresetChange = (preset) => {
@@ -99,20 +137,11 @@ export default function RulesView() {
                 },
                 body: JSON.stringify({
                     ruleSet: {
-                        name: draftRuleSet.name,
-                        outbound: draftRuleSet.name,
-                        displayName: draftRuleSet.name,
+                        ...draftToRuleSetPayload(draftRuleSet),
+                        outbound: draftRuleSet.name.trim(),
                         source: {
                             kind: 'manual',
                             providerName: 'Custom',
-                        },
-                        rules: {
-                            site_rules: draftRuleSet.site ? draftRuleSet.site.split(',').map(value => value.trim()).filter(Boolean) : [],
-                            ip_rules: draftRuleSet.ip ? draftRuleSet.ip.split(',').map(value => value.trim()).filter(Boolean) : [],
-                            domain_suffix: draftRuleSet.domain_suffix ? draftRuleSet.domain_suffix.split(',').map(value => value.trim()).filter(Boolean) : [],
-                            domain_keyword: draftRuleSet.domain_keyword ? draftRuleSet.domain_keyword.split(',').map(value => value.trim()).filter(Boolean) : [],
-                            ip_cidr: draftRuleSet.ip_cidr ? draftRuleSet.ip_cidr.split(',').map(value => value.trim()).filter(Boolean) : [],
-                            protocol: draftRuleSet.protocol ? draftRuleSet.protocol.split(',').map(value => value.trim()).filter(Boolean) : [],
                         },
                     },
                 }),
@@ -125,17 +154,59 @@ export default function RulesView() {
 
             await refreshProviderRuleSets();
             setSelectedProviderRuleSetIds((currentIds) => Array.from(new Set([...currentIds, data.ruleSet.id])));
-            setDraftRuleSet({
-                name: '',
-                site: '',
-                ip: '',
-                domain_suffix: '',
-                domain_keyword: '',
-                ip_cidr: '',
-                protocol: '',
-            });
+            setDraftRuleSet(EMPTY_RULE_SET_DRAFT);
         } finally {
             setIsSavingRuleSet(false);
+        }
+    };
+
+    const startEditingRuleSet = (ruleSet) => {
+        setRuleSetError(null);
+        setEditingRuleSetId(ruleSet.id);
+        setEditDraftRuleSet(ruleSetToDraft(ruleSet));
+    };
+
+    const cancelEditingRuleSet = () => {
+        setEditingRuleSetId(null);
+        setEditDraftRuleSet(null);
+    };
+
+    const updateEditDraftRuleSet = (field, value) => {
+        setEditDraftRuleSet((currentRuleSet) => ({
+            ...currentRuleSet,
+            [field]: value,
+        }));
+    };
+
+    const saveEditedRuleSet = async () => {
+        if (!editingRuleSetId || !editDraftRuleSet?.name.trim()) {
+            return;
+        }
+
+        setIsSavingEdit(true);
+        setRuleSetError(null);
+        try {
+            const response = await fetch(`/api/rulesets/${encodeURIComponent(editingRuleSetId)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ruleSet: draftToRuleSetPayload(editDraftRuleSet),
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update rule set');
+            }
+
+            await refreshProviderRuleSets();
+            cancelEditingRuleSet();
+        } catch (saveError) {
+            setRuleSetError(saveError.message);
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
@@ -156,6 +227,9 @@ export default function RulesView() {
             }
 
             setSelectedProviderRuleSetIds((currentIds) => currentIds.filter(id => id !== ruleSet.id));
+            if (editingRuleSetId === ruleSet.id) {
+                cancelEditingRuleSet();
+            }
             await refreshProviderRuleSets();
         } catch (deleteError) {
             setRuleSetError(deleteError.message);
@@ -251,6 +325,56 @@ export default function RulesView() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {providerRuleSets.map((ruleSet) => {
                             const checked = selectedProviderRuleSetIds.includes(ruleSet.id);
+                            const isEditing = editingRuleSetId === ruleSet.id;
+
+                            if (isEditing && editDraftRuleSet) {
+                                return (
+                                    <div
+                                        key={ruleSet.id}
+                                        className="p-4 rounded-xl border border-indigo-200 bg-indigo-50 shadow-sm"
+                                    >
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Name *</label>
+                                                <input
+                                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                    value={editDraftRuleSet.name}
+                                                    onChange={e => updateEditDraftRuleSet('name', e.target.value)}
+                                                />
+                                            </div>
+                                            {RULE_SET_FIELDS.map((field) => (
+                                                <div key={field}>
+                                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                                        {ruleFieldLabel(field)}
+                                                    </label>
+                                                    <input
+                                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                        value={editDraftRuleSet[field]}
+                                                        onChange={e => updateEditDraftRuleSet(field, e.target.value)}
+                                                    />
+                                                </div>
+                                            ))}
+                                            <div className="flex justify-end gap-2 pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelEditingRuleSet}
+                                                    className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={saveEditedRuleSet}
+                                                    disabled={isSavingEdit || !editDraftRuleSet.name.trim()}
+                                                    className="px-3 py-2 text-sm bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isSavingEdit ? 'Saving...' : 'Save'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
 
                             return (
                                 <label
@@ -279,16 +403,28 @@ export default function RulesView() {
                                                 Domains {ruleSet.rules?.domain_suffix?.length || 0} · Keywords {ruleSet.rules?.domain_keyword?.length || 0} · CIDRs {ruleSet.rules?.ip_cidr?.length || 0}
                                             </div>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={(event) => {
-                                                event.preventDefault();
-                                                deleteRuleSet(ruleSet);
-                                            }}
-                                            className="ml-4 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg"
-                                        >
-                                            Delete
-                                        </button>
+                                        <div className="ml-4 flex items-center">
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    startEditingRuleSet(ruleSet);
+                                                }}
+                                                className="text-sm text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    deleteRuleSet(ruleSet);
+                                                }}
+                                                className="text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 </label>
                             );
@@ -354,10 +490,10 @@ export default function RulesView() {
                             />
                         </div>
 
-                        {['site', 'ip', 'domain_suffix', 'domain_keyword', 'ip_cidr', 'protocol'].map((field) => (
+                        {RULE_SET_FIELDS.map((field) => (
                             <div key={field}>
                                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                                    {t(`customRule${field.replace('ip', 'IP').replace('cidr', 'CIDR').replace(/_([a-z])/g, (g) => g[1].toUpperCase()).replace(/^([a-z])/, (g) => g.toUpperCase())}`) || field.replace('_', ' ')}
+                                    {ruleFieldLabel(field)}
                                 </label>
                                 <input
                                     className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
