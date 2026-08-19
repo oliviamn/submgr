@@ -27,7 +27,7 @@ Do **not** commit secrets to `wrangler.jsonc`. Keep them in:
 
 ## Authentication (Cloudflare Access)
 
-The dashboard and all management APIs are protected by [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-public-hostname/) (OAuth at the edge, e.g. Google or GitHub login). Only the client-facing config fetch endpoints (`GET /api/{xray|singbox|clash|surge|raw}/{shortcode}`) are public.
+The dashboard and all management APIs are protected by [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-public-hostname/) (OAuth at the edge, e.g. Google or GitHub login). Only the client-facing config fetch endpoints (`GET /api/{xray|singbox|clash|surge|shadowrocket|raw}/{shortcode}`) are public.
 
 Setup:
 

@@ -588,3 +588,21 @@ export const SURGE_CONFIG = {
 		'hide-udp': false
 	}
 };
+
+// Shadowrocket base configuration.
+// Uses Shadowrocket-specific [General] keys (NOT Surge's): unknown Surge keys
+// (http-listen, wifi-access-*, geoip-maxmind-url, ...) are silently ignored by
+// Shadowrocket, so they are intentionally omitted here.
+export const SHADOWROCKET_CONFIG = {
+	'general': {
+		'dns-server': 'https://223.5.5.5/dns-query, https://120.53.53.53/dns-query',
+		'fallback-dns-server': 'system',
+		'ipv6': false,
+		'skip-proxy': '127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,localhost,*.local',
+		'tun-excluded-routes': '10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,172.16.0.0/12',
+		'private-ip-answer': true,
+		'dns-direct-fallback-proxy': true,
+		'hijack-dns': '*:53',
+		'udp-policy-not-supported-behaviour': 'REJECT'
+	}
+};

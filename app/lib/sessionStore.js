@@ -1,5 +1,5 @@
 export const SESSIONS_INDEX_KEY = 'sessions_index';
-export const MANAGED_SESSION_TYPES = ['raw', 'xray', 'singbox', 'clash', 'surge'];
+export const MANAGED_SESSION_TYPES = ['raw', 'xray', 'singbox', 'clash', 'surge', 'shadowrocket'];
 
 async function readSessionsIndex(env) {
   const rawIndex = await env.SUBMGR_KV.get(SESSIONS_INDEX_KEY);

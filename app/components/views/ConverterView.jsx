@@ -6,6 +6,7 @@ import { useDashboard } from '../dashboard/DashboardContext';
 import { SingboxConfigBuilder } from '../../lib/SingboxConfigBuilder';
 import { ClashConfigBuilder } from '../../lib/ClashConfigBuilder';
 import { SurgeConfigBuilder } from '../../lib/SurgeConfigBuilder';
+import { ShadowrocketConfigBuilder } from '../../lib/ShadowrocketConfigBuilder';
 
 export default function ConverterView() {
     const {
@@ -122,7 +123,8 @@ export default function ConverterView() {
                 xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
                 singbox: new SingboxConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
                 clash: new ClashConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
-                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets)
+                surge: new SurgeConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
+                shadowrocket: new ShadowrocketConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], baseConfig, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets)
             };
 
             // Generate a single shortcode for all types
@@ -135,9 +137,12 @@ export default function ConverterView() {
             // Save shortcode to local storage
             localStorage.setItem('lastShortCode', shortCode);
 
-            // Special handling for Surge subscription URL if needed
+            // Special handling for Surge / Shadowrocket subscription URL if needed
             if (builders.surge.setSubscriptionUrl) {
                 builders.surge.setSubscriptionUrl(`${window.location.origin}/api/surge/${shortCode}`);
+            }
+            if (builders.shadowrocket.setSubscriptionUrl) {
+                builders.shadowrocket.setSubscriptionUrl(`${window.location.origin}/api/shadowrocket/${shortCode}`);
             }
 
             const configs = {};

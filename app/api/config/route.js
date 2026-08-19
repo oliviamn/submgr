@@ -6,6 +6,7 @@ import { buildManagedSessionSummary, getManagedSessionSummary, upsertManagedSess
 const CONTENT_TYPES = {
   clash: 'application/yaml',
   surge: 'text/plain',
+  shadowrocket: 'text/plain',
   xray: 'application/json',
   singbox: 'application/json',
   raw: 'application/json'
@@ -55,9 +56,10 @@ export async function POST(request) {
         };
         configContent = JSON.stringify(rawConfig, null, 2);
       } else {
-        // For built configs (clash, surge, singbox, xray), store as-is
+        // For built configs (clash, surge, shadowrocket, singbox, xray), store as-is
         switch (type) {
           case 'surge':
+          case 'shadowrocket':
             configContent = config;
             break;
           case 'clash':

@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 // Validate client type
-const VALID_TYPES = ['xray', 'singbox', 'clash', 'surge', 'raw'];
+const VALID_TYPES = ['xray', 'singbox', 'clash', 'surge', 'shadowrocket', 'raw'];
 
 // Content type mapping
 const CONTENT_TYPES = {
   clash: 'application/yaml; charset=utf-8',
   surge: 'text/plain; charset=utf-8',
+  shadowrocket: 'text/plain; charset=utf-8',
   xray: 'application/json; charset=utf-8',
   singbox: 'application/json; charset=utf-8',
   raw: 'application/json; charset=utf-8'

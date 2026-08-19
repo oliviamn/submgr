@@ -372,10 +372,11 @@ export function DashboardProvider({ children }) {
         singbox: { type: 'singbox' },
         clash: { type: 'clash' },
         surge: { type: 'surge' },
+        shadowrocket: { type: 'shadowrocket' },
       });
 
       const newShortLinks = {};
-      ['xray', 'singbox', 'clash', 'surge'].forEach((type) => {
+      ['xray', 'singbox', 'clash', 'surge', 'shadowrocket'].forEach((type) => {
         newShortLinks[type] = `${window.location.origin}/api/${type}/${normalizedShortCode}`;
       });
       setShortLinks(newShortLinks);
