@@ -13,6 +13,7 @@ export default function SessionsView() {
         loadManagedSessions,
         loadConfigByShortCode,
         renameManagedSession,
+        cloneManagedSessionByShortCode,
         deleteManagedSessionByShortCode,
         setActiveView,
     } = useDashboard();
@@ -64,6 +65,15 @@ export default function SessionsView() {
 
         try {
             await deleteManagedSessionByShortCode(shortCode);
+        } catch (error) {
+            setSessionListError(error.message);
+        }
+    };
+
+    const handleCloneSession = async (shortCode) => {
+        try {
+            await cloneManagedSessionByShortCode(shortCode);
+            setSessionListError(null);
         } catch (error) {
             setSessionListError(error.message);
         }
@@ -212,6 +222,12 @@ export default function SessionsView() {
                                                     className="px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 rounded-lg"
                                                 >
                                                     Rename
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCloneSession(session.shortCode)}
+                                                    className="px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 rounded-lg"
+                                                >
+                                                    Clone
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteSession(session.shortCode)}

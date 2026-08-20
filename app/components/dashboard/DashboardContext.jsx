@@ -199,6 +199,25 @@ export function DashboardProvider({ children }) {
     return true;
   };
 
+  const cloneManagedSessionByShortCode = async (shortCode) => {
+    if (!shortCode) {
+      return false;
+    }
+
+    const response = await fetch(`/api/sessions/${encodeURIComponent(shortCode)}/clone`, {
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to clone saved session');
+    }
+
+    await loadManagedSessions();
+    setSessionListError(null);
+    return data.shortCode;
+  };
+
   const loadConfigByShortCode = async (requestedShortCode = shortCodeInput) => {
     const resolvedShortCode = typeof requestedShortCode === 'string'
       ? requestedShortCode
@@ -498,7 +517,8 @@ export function DashboardProvider({ children }) {
     syncSessionIndex,
     loadConfigByShortCode,
     deleteManagedSessionByShortCode,
-    renameManagedSession
+    renameManagedSession,
+    cloneManagedSessionByShortCode
   };
 
   return (

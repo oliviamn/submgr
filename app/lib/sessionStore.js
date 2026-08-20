@@ -21,6 +21,21 @@ async function writeSessionsIndex(env, index) {
   await env.SUBMGR_KV.put(SESSIONS_INDEX_KEY, JSON.stringify(index));
 }
 
+function generateShortCode() {
+  return Math.random().toString(36).substring(2, 7);
+}
+
+async function generateUniqueShortCode(env) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const shortCode = generateShortCode();
+    const existing = await env.SUBMGR_KV.get(`raw_${shortCode}`);
+    if (existing === null) {
+      return shortCode;
+    }
+  }
+  throw new Error('Failed to generate a unique short code');
+}
+
 export function buildManagedSessionSummary({ shortCode, rawConfig, existingSession }) {
   const normalizedConfig = rawConfig?.config || rawConfig || {};
   const rules = normalizedConfig.rules || {};
@@ -113,4 +128,52 @@ export async function deleteManagedSession(env, shortCode) {
   const index = await readSessionsIndex(env);
   index.sessions = index.sessions.filter((session) => session.shortCode !== shortCode);
   await writeSessionsIndex(env, index);
+}
+
+export async function cloneManagedSession(env, sourceShortCode) {
+  const rawConfig = await env.SUBMGR_KV.get(`raw_${sourceShortCode}`);
+  if (rawConfig === null) {
+    return null;
+  }
+
+  const parsedConfig = JSON.parse(rawConfig);
+  const targetShortCode = await generateUniqueShortCode(env);
+  const now = new Date().toISOString();
+
+  // Deep-copy the recipe and refresh its creation timestamp while keeping the
+  // original KV shape (nested `config` object vs flat legacy layout).
+  const copiedRawConfig = JSON.parse(JSON.stringify(parsedConfig));
+  if (copiedRawConfig.config) {
+    copiedRawConfig.config = {
+      ...copiedRawConfig.config,
+      configCreatedTime: now,
+    };
+  } else {
+    copiedRawConfig.configCreatedTime = now;
+  }
+
+  await env.SUBMGR_KV.put(`raw_${targetShortCode}`, JSON.stringify(copiedRawConfig, null, 2));
+
+  // Copy all derived client configs (raw is handled above).
+  await Promise.all(
+    MANAGED_SESSION_TYPES
+      .filter((type) => type !== 'raw')
+      .map(async (type) => {
+        const sourceValue = await env.SUBMGR_KV.get(`${type}_${sourceShortCode}`);
+        if (sourceValue !== null) {
+          await env.SUBMGR_KV.put(`${type}_${targetShortCode}`, sourceValue);
+        }
+      })
+  );
+
+  const session = await upsertManagedSession(env, buildManagedSessionSummary({
+    shortCode: targetShortCode,
+    rawConfig: copiedRawConfig,
+    existingSession: null,
+  }));
+
+  return {
+    shortCode: targetShortCode,
+    session,
+  };
 }
