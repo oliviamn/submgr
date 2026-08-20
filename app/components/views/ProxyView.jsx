@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useDashboard } from '../dashboard/DashboardContext';
-import { t } from '../../lib/i18n';
+import ProxyNodeEditor from '../ProxyNodeEditor';
 
 export default function ProxyView() {
     const {
@@ -14,6 +14,7 @@ export default function ProxyView() {
     const [proxyInput, setProxyInput] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
+    const [editorState, setEditorState] = useState(null); // null | { proxyNode }
 
     // Auto-decode base64 if the input looks like base64
     const handleStandaloneProxiesChange = (value) => {
@@ -173,6 +174,13 @@ export default function ProxyView() {
                     >
                         Refresh
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setEditorState({ proxyNode: null })}
+                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Add Proxy
+                    </button>
                 </div>
 
                 {proxyNodes.length === 0 ? (
@@ -199,6 +207,13 @@ export default function ProxyView() {
                                 </label>
                                 <button
                                     type="button"
+                                    onClick={() => setEditorState({ proxyNode })}
+                                    className="ml-4 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => handleDeleteProxyNode(proxyNode.id)}
                                     className="ml-4 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
                                 >
@@ -209,6 +224,17 @@ export default function ProxyView() {
                     </div>
                 )}
             </div>
+
+            {editorState && (
+                <ProxyNodeEditor
+                    proxyNode={editorState.proxyNode}
+                    onClose={() => setEditorState(null)}
+                    onSaved={async () => {
+                        setEditorState(null);
+                        await refreshProxyNodes();
+                    }}
+                />
+            )}
         </div>
     );
 }
