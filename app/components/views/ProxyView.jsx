@@ -112,6 +112,24 @@ export default function ProxyView() {
         }
     };
 
+    const handleCloneProxyNode = async (proxyNodeId) => {
+        try {
+            setError(null);
+            const response = await fetch(`/api/proxies/${encodeURIComponent(proxyNodeId)}/clone`, {
+                method: 'POST',
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to clone proxy node');
+            }
+
+            await refreshProxyNodes();
+        } catch (cloneError) {
+            setError(cloneError.message);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col">
@@ -211,6 +229,13 @@ export default function ProxyView() {
                                     className="ml-4 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
                                 >
                                     Edit
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCloneProxyNode(proxyNode.id)}
+                                    className="ml-4 px-3 py-2 text-sm text-teal-600 hover:bg-teal-50 rounded-lg"
+                                >
+                                    Clone
                                 </button>
                                 <button
                                     type="button"

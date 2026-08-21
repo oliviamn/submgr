@@ -1,4 +1,5 @@
 import { ProxyParser } from './ProxyParsers.js';
+import { serializeProxy } from './ProxySerializers.js';
 
 export const PROXY_NODES_INDEX_KEY = 'proxy_nodes_index';
 
@@ -13,7 +14,7 @@ function hashString(input = '') {
   return Math.abs(hash).toString(36);
 }
 
-function createProxyNodeId(proxyNode = {}, rawValue = '') {
+export function createProxyNodeId(proxyNode = {}, rawValue = '') {
   const stableValue = rawValue || JSON.stringify({
     tag: proxyNode.tag,
     type: proxyNode.type,
@@ -126,4 +127,40 @@ export async function deleteProxyNode(env, proxyNodeId) {
   const index = await readProxyNodesIndex(env);
   index.proxyNodes = index.proxyNodes.filter(item => item.id !== proxyNodeId);
   await writeProxyNodesIndex(env, index);
+}
+
+export async function cloneProxyNode(env, proxyNodeId, options = {}) {
+  const existingProxyNode = await getProxyNode(env, proxyNodeId);
+  if (!existingProxyNode) {
+    return null;
+  }
+
+  const clonedProxyNode = JSON.parse(JSON.stringify(existingProxyNode));
+  delete clonedProxyNode.id;
+  delete clonedProxyNode.updatedAt;
+
+  const baseTag = String(clonedProxyNode.tag || '')
+    .replace(/\s*\(copy(?:\s*\d+)?\)\s*$/i, '')
+    .trim();
+  const tagPrefix = baseTag ? `${baseTag} ` : '';
+
+  // The node id is derived from rawValue, so a clone must get a distinct name
+  // (and regenerated URL). If the plain "(copy)" suffix collides with an
+  // existing id (e.g. cloning an existing copy), bump a counter.
+  let candidate = { ...clonedProxyNode };
+  let rawValue = '';
+  let id = null;
+  let copyIndex = 1;
+
+  while (id === null || await env.SUBMGR_KV.get(id) !== null) {
+    const explicitTag = options.tag && copyIndex === 1
+      ? String(options.tag).trim()
+      : '';
+    candidate.tag = explicitTag || `${tagPrefix}(copy${copyIndex > 1 ? ` ${copyIndex}` : ''})`;
+    rawValue = serializeProxy(candidate) || candidate.rawValue || '';
+    id = createProxyNodeId(candidate, rawValue);
+    copyIndex += 1;
+  }
+
+  return saveProxyNode(env, candidate, rawValue);
 }
