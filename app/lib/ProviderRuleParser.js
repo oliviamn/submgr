@@ -77,6 +77,7 @@ function createEmptyRuleSet(rawName, format) {
       general: {
         skip_proxy: [],
         tun_excluded_routes: [],
+        always_real_ip: [],
       },
     },
   };
@@ -102,6 +103,7 @@ function normalizeRuleSets(ruleSets = []) {
         general: {
           skip_proxy: uniqueStrings(ruleSet.rules?.general?.skip_proxy),
           tun_excluded_routes: uniqueStrings(ruleSet.rules?.general?.tun_excluded_routes),
+          always_real_ip: uniqueStrings(ruleSet.rules?.general?.always_real_ip),
         },
       },
     }))
@@ -118,7 +120,8 @@ function normalizeRuleSets(ruleSets = []) {
 
       const hasGeneralRules =
         ruleSet.rules.general.skip_proxy.length > 0 ||
-        ruleSet.rules.general.tun_excluded_routes.length > 0;
+        ruleSet.rules.general.tun_excluded_routes.length > 0 ||
+        ruleSet.rules.general.always_real_ip.length > 0;
 
       if (!ruleSet.name) {
         return false;
@@ -307,11 +310,12 @@ export class ProviderRuleParser {
     return generalRuleSet ? [generalRuleSet, ...normalized] : normalized;
   }
 
-  // Extract skip-proxy / tun-excluded-routes (and legacy bypass-tun) from the
-  // Surge [General] section into a single general rule set.
+  // Extract skip-proxy / tun-excluded-routes (and legacy bypass-tun) /
+  // always-real-ip from the Surge [General] section into a single general
+  // rule set.
   static extractSurgeGeneralRuleSet(parsedConfig) {
     const lines = parsedConfig.sections?.General || parsedConfig.sections?.GENERAL || [];
-    const general = { skip_proxy: [], tun_excluded_routes: [] };
+    const general = { skip_proxy: [], tun_excluded_routes: [], always_real_ip: [] };
 
     lines.forEach(line => {
       const separatorIndex = line.indexOf('=');
@@ -329,13 +333,16 @@ export class ProviderRuleParser {
         general.skip_proxy.push(...values);
       } else if (key === 'tun-excluded-routes' || key === 'bypass-tun') {
         general.tun_excluded_routes.push(...values);
+      } else if (key === 'always-real-ip') {
+        general.always_real_ip.push(...values);
       }
     });
 
     general.skip_proxy = uniqueStrings(general.skip_proxy);
     general.tun_excluded_routes = uniqueStrings(general.tun_excluded_routes);
+    general.always_real_ip = uniqueStrings(general.always_real_ip);
 
-    if (general.skip_proxy.length === 0 && general.tun_excluded_routes.length === 0) {
+    if (general.skip_proxy.length === 0 && general.tun_excluded_routes.length === 0 && general.always_real_ip.length === 0) {
       return null;
     }
 

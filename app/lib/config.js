@@ -557,8 +557,8 @@ export const CLASH_CONFIG = {
 	'proxy-groups': []
 };
 
-// General rules (skip-proxy / tun-excluded-routes) applied by default,
-// extended by selected general rule sets in the builders.
+// General rules (skip-proxy / tun-excluded-routes / always-real-ip) applied
+// by default, extended by selected general rule sets in the builders.
 export const DEFAULT_GENERAL_RULES = {
 	skip_proxy: [
 		'127.0.0.1',
@@ -578,6 +578,22 @@ export const DEFAULT_GENERAL_RULES = {
 		'192.168.0.0/16',
 		'10.0.0.0/8',
 		'172.16.0.0/12'
+	],
+	always_real_ip: [
+		'*.msftconnecttest.com',
+		'*.msftncsi.com',
+		'*.srv.nintendo.net',
+		'*.stun.playstation.net',
+		'xbox.*.microsoft.com',
+		'*.xboxlive.com',
+		'*.logon.battlenet.com.cn',
+		'*.logon.battle.net',
+		'stun.l.google.com',
+		'easy-login.10099.com.cn',
+		'*-update.xoyocdn.com',
+		'*.prod.cloud.netflix.com',
+		'appboot.netflix.com',
+		'*-appboot.netflix.com'
 	]
 };
 
@@ -599,7 +615,6 @@ export const SURGE_CONFIG = {
 		'encrypted-dns-server': 'https://223.5.5.5/dns-query',
 		'exclude-simple-hostnames': true,
 		'read-etc-hosts': true,
-		'always-real-ip': '*.msftconnecttest.com, *.msftncsi.com, *.srv.nintendo.net, *.stun.playstation.net, xbox.*.microsoft.com, *.xboxlive.com, *.logon.battlenet.com.cn, *.logon.battle.net, stun.l.google.com, easy-login.10099.com.cn,*-update.xoyocdn.com, *.prod.cloud.netflix.com, appboot.netflix.com, *-appboot.netflix.com',
 		'hijack-dns': '*:53',
 		'udp-policy-not-supported-behaviour': 'REJECT',
 		'hide-vpn-icon': false,
