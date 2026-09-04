@@ -32,6 +32,7 @@ const EMPTY_RULE_SET_DRAFT = {
     protocol: '',
     skip_proxy: '',
     tun_excluded_routes: '',
+    always_real_ip: '',
 };
 
 const splitRuleValues = (value) => (
@@ -52,6 +53,7 @@ const draftToRuleSetPayload = (draft) => {
                 general: {
                     skip_proxy: splitRuleValues(draft.skip_proxy),
                     tun_excluded_routes: splitRuleValues(draft.tun_excluded_routes),
+                    always_real_ip: splitRuleValues(draft.always_real_ip),
                 },
             },
         };
@@ -83,6 +85,7 @@ const ruleSetToDraft = (ruleSet) => ({
     protocol: (ruleSet.rules?.protocol || []).join(', '),
     skip_proxy: (ruleSet.rules?.general?.skip_proxy || []).join(', '),
     tun_excluded_routes: (ruleSet.rules?.general?.tun_excluded_routes || []).join(', '),
+    always_real_ip: (ruleSet.rules?.general?.always_real_ip || []).join(', '),
 });
 
 const ruleFieldLabel = (field) => (
@@ -261,6 +264,17 @@ export default function RulesView() {
                     placeholder={t('generalRuleTunRoutesPlaceholder')}
                     value={draft.tun_excluded_routes}
                     onChange={e => updateDraft('tun_excluded_routes', e.target.value)}
+                />
+            </div>
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    {t('generalRuleAlwaysRealIpLabel')}
+                </label>
+                <input
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder={t('generalRuleAlwaysRealIpPlaceholder')}
+                    value={draft.always_real_ip}
+                    onChange={e => updateDraft('always_real_ip', e.target.value)}
                 />
             </div>
         </>
@@ -506,7 +520,7 @@ export default function RulesView() {
                                             </div>
                                             {ruleSet.kind === 'general' ? (
                                                 <div className="text-xs text-gray-500 mt-2">
-                                                    {t('generalRuleSkipProxyShort')} {ruleSet.rules?.general?.skip_proxy?.length || 0} · {t('generalRuleTunRoutesShort')} {ruleSet.rules?.general?.tun_excluded_routes?.length || 0}
+                                                    {t('generalRuleSkipProxyShort')} {ruleSet.rules?.general?.skip_proxy?.length || 0} · {t('generalRuleTunRoutesShort')} {ruleSet.rules?.general?.tun_excluded_routes?.length || 0} · {t('generalRuleAlwaysRealIpShort')} {ruleSet.rules?.general?.always_real_ip?.length || 0}
                                                 </div>
                                             ) : (
                                                 <div className="text-xs text-gray-500 mt-2">
@@ -581,7 +595,7 @@ export default function RulesView() {
                     <button
                         type="button"
                         onClick={saveDraftRuleSet}
-                        disabled={isSavingRuleSet || !draftRuleSet.name.trim() || (draftRuleSet.kind === 'general' && splitRuleValues(draftRuleSet.skip_proxy).length === 0 && splitRuleValues(draftRuleSet.tun_excluded_routes).length === 0)}
+                        disabled={isSavingRuleSet || !draftRuleSet.name.trim() || (draftRuleSet.kind === 'general' && splitRuleValues(draftRuleSet.skip_proxy).length === 0 && splitRuleValues(draftRuleSet.tun_excluded_routes).length === 0 && splitRuleValues(draftRuleSet.always_real_ip).length === 0)}
                         className="px-4 py-2 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="16" /><line x1="8" x2="16" y1="12" y2="12" /></svg>

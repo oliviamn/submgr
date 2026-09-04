@@ -110,9 +110,12 @@ const translations = {
     generalRuleSkipProxyPlaceholder: '例如：*.example.com, 192.168.1.0/24',
     generalRuleTunRoutesLabel: 'TUN 排除路由 / bypass-tun（仅 CIDR，逗号分隔）',
     generalRuleTunRoutesPlaceholder: '例如：192.168.0.0/16, 10.0.0.0/8',
+    generalRuleAlwaysRealIpLabel: 'Always Real IP（域名 / IP，逗号分隔）',
+    generalRuleAlwaysRealIpPlaceholder: '例如：*.msftconnecttest.com, stun.l.google.com',
     generalRuleBadge: '通用',
     generalRuleSkipProxyShort: 'Skip-proxy',
     generalRuleTunRoutesShort: 'TUN 路由',
+    generalRuleAlwaysRealIpShort: 'Real-IP',
     generalRuleInvalidCidr: 'TUN 排除路由必须是 CIDR 格式（例如 192.168.0.0/16）'
   },
   'en-US': {
@@ -223,9 +226,12 @@ const translations = {
     generalRuleSkipProxyPlaceholder: 'e.g., *.example.com, 192.168.1.0/24',
     generalRuleTunRoutesLabel: 'TUN Excluded Routes / bypass-tun (CIDRs only, comma-separated)',
     generalRuleTunRoutesPlaceholder: 'e.g., 192.168.0.0/16, 10.0.0.0/8',
+    generalRuleAlwaysRealIpLabel: 'Always Real IP (domains / IPs, comma-separated)',
+    generalRuleAlwaysRealIpPlaceholder: 'e.g., *.msftconnecttest.com, stun.l.google.com',
     generalRuleBadge: 'General',
     generalRuleSkipProxyShort: 'Skip-proxy',
     generalRuleTunRoutesShort: 'TUN routes',
+    generalRuleAlwaysRealIpShort: 'Real-IP',
     generalRuleInvalidCidr: 'TUN excluded routes must be CIDR entries (e.g., 192.168.0.0/16)'
   },
   'fa': {
@@ -315,9 +321,12 @@ const translations = {
     generalRuleSkipProxyPlaceholder: 'برای مثال: *.example.com, 192.168.1.0/24',
     generalRuleTunRoutesLabel: 'مسیرهای حذف‌شده TUN / bypass-tun (فقط CIDR، جدا شده با کاما)',
     generalRuleTunRoutesPlaceholder: 'برای مثال: 192.168.0.0/16, 10.0.0.0/8',
+    generalRuleAlwaysRealIpLabel: 'Always Real IP (دامنه‌ها / IP، جدا شده با کاما)',
+    generalRuleAlwaysRealIpPlaceholder: 'برای مثال: *.msftconnecttest.com, stun.l.google.com',
     generalRuleBadge: 'عمومی',
     generalRuleSkipProxyShort: 'Skip-proxy',
     generalRuleTunRoutesShort: 'مسیرهای TUN',
+    generalRuleAlwaysRealIpShort: 'Real-IP',
     generalRuleInvalidCidr: 'مسیرهای حذف‌شده TUN باید به فرمت CIDR باشند (مثلاً 192.168.0.0/16)'
   }
 };

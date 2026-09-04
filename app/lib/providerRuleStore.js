@@ -123,6 +123,7 @@ function normalizeRuleSet(ruleSet = {}, existingRuleSet = {}) {
       general: {
         skip_proxy: uniqueStrings(ruleSet.rules?.general?.skip_proxy || safeExistingRuleSet.rules?.general?.skip_proxy),
         tun_excluded_routes: uniqueStrings(ruleSet.rules?.general?.tun_excluded_routes || safeExistingRuleSet.rules?.general?.tun_excluded_routes),
+        always_real_ip: uniqueStrings(ruleSet.rules?.general?.always_real_ip || safeExistingRuleSet.rules?.general?.always_real_ip),
       },
     },
   };
