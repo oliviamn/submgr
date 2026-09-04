@@ -48,6 +48,30 @@ export async function POST(request) {
       });
     }
 
+    const isGeneral = ruleSet.kind === 'general';
+    const generalRules = ruleSet.rules?.general || {};
+
+    if (isGeneral) {
+      const skipProxy = Array.isArray(generalRules.skip_proxy) ? generalRules.skip_proxy.filter(Boolean) : [];
+      const tunExcludedRoutes = Array.isArray(generalRules.tun_excluded_routes) ? generalRules.tun_excluded_routes.filter(Boolean) : [];
+
+      if (skipProxy.length === 0 && tunExcludedRoutes.length === 0) {
+        return NextResponse.json({
+          error: 'General rule sets need at least one skip-proxy or tun-excluded-routes entry',
+        }, {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      ruleSet.rules = { general: { skip_proxy: skipProxy, tun_excluded_routes: tunExcludedRoutes } };
+    } else {
+      ruleSet.kind = 'routing';
+      if (ruleSet.rules) {
+        delete ruleSet.rules.general;
+      }
+    }
+
     const savedRuleSet = await saveProviderRuleSet(env, ruleSet);
 
     return NextResponse.json({

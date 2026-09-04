@@ -1,6 +1,7 @@
 import { SING_BOX_CONFIG, generateRuleSets, generateRules, getOutbounds, PREDEFINED_RULE_SETS} from './config.js';
 import { BaseConfigBuilder } from './BaseConfigBuilder.js';
 import { DeepCopy } from './utils.js';
+import { applySingboxGeneralRules, resolveGeneralRules } from './generalRules.js';
 import { t } from './i18n/index.js';
 
 export class SingboxConfigBuilder extends BaseConfigBuilder {
@@ -218,6 +219,8 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         if (this.useDefaultBaseConfig && this.config.dns?.servers?.[0]) {
             this.config.dns.servers[0].detour = t('outboundNames.Node Select');
         }
+
+        applySingboxGeneralRules(this.config, resolveGeneralRules(this.getGeneralRuleSets()));
 
         return this.config;
     }

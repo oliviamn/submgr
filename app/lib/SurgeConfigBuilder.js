@@ -1,5 +1,6 @@
 import { BaseConfigBuilder } from './BaseConfigBuilder.js';
 import { SURGE_CONFIG, SURGE_SITE_RULE_SET_BASEURL, SURGE_IP_RULE_SET_BASEURL, generateRules, getOutbounds, PREDEFINED_RULE_SETS } from './config.js';
+import { applySurgeGeneralRules, resolveGeneralRules } from './generalRules.js';
 import { t } from './i18n/index.js';
 
 export class SurgeConfigBuilder extends BaseConfigBuilder {
@@ -202,6 +203,7 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
 
         finalConfig.push('[General]');
         if (this.config.general) {
+            applySurgeGeneralRules(this.config.general, resolveGeneralRules(this.getGeneralRuleSets()));
             Object.entries(this.config.general).forEach(([key, value]) => {
                 finalConfig.push(`${key} = ${value}`);
             });
@@ -264,7 +266,7 @@ export class SurgeConfigBuilder extends BaseConfigBuilder {
         });
 
         providerRules.forEach((rule, index) => {
-            const sourceRuleSet = this.providerRuleSets[index];
+            const sourceRuleSet = this.getRoutingProviderRuleSets()[index];
             const remoteSources = this.getProviderRemoteSources(sourceRuleSet, 'surge');
 
             if (remoteSources.length > 0) {

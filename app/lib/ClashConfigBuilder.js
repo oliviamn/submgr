@@ -2,6 +2,7 @@ import yaml from 'js-yaml';
 import { CLASH_CONFIG, generateRules, generateClashRuleSets, getOutbounds, PREDEFINED_RULE_SETS } from './config.js';
 import { BaseConfigBuilder } from './BaseConfigBuilder.js';
 import { DeepCopy } from './utils.js';
+import { applyClashGeneralRules, resolveGeneralRules } from './generalRules.js';
 import { t } from './i18n/index.js';
 
 export class ClashConfigBuilder extends BaseConfigBuilder {
@@ -248,7 +249,7 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
 
         const providerRuleProviders = {};
         providerRules.forEach((rule, index) => {
-            const sourceRuleSet = this.providerRuleSets[index];
+            const sourceRuleSet = this.getRoutingProviderRuleSets()[index];
             const remoteSources = this.getProviderRemoteSources(sourceRuleSet, 'clash');
 
             if (remoteSources.length > 0) {
@@ -286,6 +287,8 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
         this.config.rules = [...ruleResults]
 
         this.config.rules.push(`MATCH,${t('outboundNames.Fall Back')}`);
+
+        applyClashGeneralRules(this.config, resolveGeneralRules(this.getGeneralRuleSets()));
 
         return yaml.dump(this.config);
     }
