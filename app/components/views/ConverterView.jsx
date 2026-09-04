@@ -107,7 +107,7 @@ export default function ConverterView() {
             const baseConfig = {};
             const selectedProviderRuleSets = providerRuleSets.filter(ruleSet => selectedProviderRuleSetIds.includes(ruleSet.id));
             const managedCustomRules = selectedProviderRuleSets
-                .filter(ruleSet => ruleSet.source?.kind === 'manual')
+                .filter(ruleSet => ruleSet.kind !== 'general' && ruleSet.source?.kind === 'manual')
                 .map(ruleSet => ({
                     name: ruleSet.outbound || ruleSet.name,
                     site: (ruleSet.rules?.site_rules || []).join(','),
@@ -117,7 +117,7 @@ export default function ConverterView() {
                     ip_cidr: (ruleSet.rules?.ip_cidr || []).join(','),
                     protocol: (ruleSet.rules?.protocol || []).join(','),
                 }));
-            const extractedProviderRuleSets = selectedProviderRuleSets.filter(ruleSet => ruleSet.source?.kind !== 'manual');
+            const extractedProviderRuleSets = selectedProviderRuleSets.filter(ruleSet => ruleSet.kind === 'general' || ruleSet.source?.kind !== 'manual');
 
             const builders = {
                 xray: new SingboxConfigBuilder(standaloneProxies, selectedRules, [...customRules, ...managedCustomRules], undefined, currentLang, userAgent, proxyEnabled, proxyUrl, enabledSubProxies, extractedProviderRuleSets),
