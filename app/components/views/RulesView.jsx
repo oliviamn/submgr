@@ -19,41 +19,70 @@ const AVAILABLE_RULES = [
 
 const RULE_SET_FIELDS = ['site', 'ip', 'domain_suffix', 'domain_keyword', 'ip_cidr', 'protocol'];
 
+const CIDR_ENTRY_REGEX = /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/;
+
 const EMPTY_RULE_SET_DRAFT = {
     name: '',
+    kind: 'routing',
     site: '',
     ip: '',
     domain_suffix: '',
     domain_keyword: '',
     ip_cidr: '',
     protocol: '',
+    skip_proxy: '',
+    tun_excluded_routes: '',
 };
 
 const splitRuleValues = (value) => (
     value ? value.split(',').map(item => item.trim()).filter(Boolean) : []
 );
 
-const draftToRuleSetPayload = (draft) => ({
-    name: draft.name.trim(),
-    displayName: draft.name.trim(),
-    rules: {
-        site_rules: splitRuleValues(draft.site),
-        ip_rules: splitRuleValues(draft.ip),
-        domain_suffix: splitRuleValues(draft.domain_suffix),
-        domain_keyword: splitRuleValues(draft.domain_keyword),
-        ip_cidr: splitRuleValues(draft.ip_cidr),
-        protocol: splitRuleValues(draft.protocol),
-    },
-});
+const findInvalidCidrEntries = (value) => (
+    splitRuleValues(value).filter(entry => !CIDR_ENTRY_REGEX.test(entry))
+);
+
+const draftToRuleSetPayload = (draft) => {
+    if (draft.kind === 'general') {
+        return {
+            kind: 'general',
+            name: draft.name.trim(),
+            displayName: draft.name.trim(),
+            rules: {
+                general: {
+                    skip_proxy: splitRuleValues(draft.skip_proxy),
+                    tun_excluded_routes: splitRuleValues(draft.tun_excluded_routes),
+                },
+            },
+        };
+    }
+
+    return {
+        kind: 'routing',
+        name: draft.name.trim(),
+        displayName: draft.name.trim(),
+        rules: {
+            site_rules: splitRuleValues(draft.site),
+            ip_rules: splitRuleValues(draft.ip),
+            domain_suffix: splitRuleValues(draft.domain_suffix),
+            domain_keyword: splitRuleValues(draft.domain_keyword),
+            ip_cidr: splitRuleValues(draft.ip_cidr),
+            protocol: splitRuleValues(draft.protocol),
+        },
+    };
+};
 
 const ruleSetToDraft = (ruleSet) => ({
     name: ruleSet.name || '',
+    kind: ruleSet.kind === 'general' ? 'general' : 'routing',
     site: (ruleSet.rules?.site_rules || []).join(', '),
     ip: (ruleSet.rules?.ip_rules || []).join(', '),
     domain_suffix: (ruleSet.rules?.domain_suffix || []).join(', '),
     domain_keyword: (ruleSet.rules?.domain_keyword || []).join(', '),
     ip_cidr: (ruleSet.rules?.ip_cidr || []).join(', '),
     protocol: (ruleSet.rules?.protocol || []).join(', '),
+    skip_proxy: (ruleSet.rules?.general?.skip_proxy || []).join(', '),
+    tun_excluded_routes: (ruleSet.rules?.general?.tun_excluded_routes || []).join(', '),
 });
 
 const ruleFieldLabel = (field) => (
@@ -128,6 +157,15 @@ export default function RulesView() {
             return;
         }
 
+        if (draftRuleSet.kind === 'general') {
+            const invalidEntries = findInvalidCidrEntries(draftRuleSet.tun_excluded_routes);
+            if (invalidEntries.length > 0) {
+                setRuleSetError(`${t('generalRuleInvalidCidr')}: ${invalidEntries.join(', ')}`);
+                return;
+            }
+        }
+
+        setRuleSetError(null);
         setIsSavingRuleSet(true);
         try {
             const response = await fetch('/api/rulesets', {
@@ -178,9 +216,67 @@ export default function RulesView() {
         }));
     };
 
+    const renderKindToggle = (draft, updateDraft) => (
+        <div className="col-span-1 md:col-span-2 lg:col-span-3 mb-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                {t('ruleSetKindLabel')}
+            </label>
+            <div className="flex gap-2">
+                {['routing', 'general'].map((kind) => (
+                    <button
+                        key={kind}
+                        type="button"
+                        onClick={() => updateDraft('kind', kind)}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${draft.kind === kind
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                            }`}
+                    >
+                        {kind === 'general' ? t('ruleSetKindGeneral') : t('ruleSetKindRouting')}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    const renderGeneralFields = (draft, updateDraft) => (
+        <>
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    {t('generalRuleSkipProxyLabel')}
+                </label>
+                <input
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder={t('generalRuleSkipProxyPlaceholder')}
+                    value={draft.skip_proxy}
+                    onChange={e => updateDraft('skip_proxy', e.target.value)}
+                />
+            </div>
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    {t('generalRuleTunRoutesLabel')}
+                </label>
+                <input
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder={t('generalRuleTunRoutesPlaceholder')}
+                    value={draft.tun_excluded_routes}
+                    onChange={e => updateDraft('tun_excluded_routes', e.target.value)}
+                />
+            </div>
+        </>
+    );
+
     const saveEditedRuleSet = async () => {
         if (!editingRuleSetId || !editDraftRuleSet?.name.trim()) {
             return;
+        }
+
+        if (editDraftRuleSet.kind === 'general') {
+            const invalidEntries = findInvalidCidrEntries(editDraftRuleSet.tun_excluded_routes);
+            if (invalidEntries.length > 0) {
+                setRuleSetError(`${t('generalRuleInvalidCidr')}: ${invalidEntries.join(', ')}`);
+                return;
+            }
         }
 
         setIsSavingEdit(true);
@@ -342,18 +438,20 @@ export default function RulesView() {
                                                     onChange={e => updateEditDraftRuleSet('name', e.target.value)}
                                                 />
                                             </div>
-                                            {RULE_SET_FIELDS.map((field) => (
-                                                <div key={field}>
-                                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                                                        {ruleFieldLabel(field)}
-                                                    </label>
-                                                    <input
-                                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                                        value={editDraftRuleSet[field]}
-                                                        onChange={e => updateEditDraftRuleSet(field, e.target.value)}
-                                                    />
-                                                </div>
-                                            ))}
+                                            {editDraftRuleSet.kind === 'general'
+                                                ? renderGeneralFields(editDraftRuleSet, updateEditDraftRuleSet)
+                                                : RULE_SET_FIELDS.map((field) => (
+                                                    <div key={field}>
+                                                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                                            {ruleFieldLabel(field)}
+                                                        </label>
+                                                        <input
+                                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                            value={editDraftRuleSet[field]}
+                                                            onChange={e => updateEditDraftRuleSet(field, e.target.value)}
+                                                        />
+                                                    </div>
+                                                ))}
                                             <div className="flex justify-end gap-2 pt-1">
                                                 <button
                                                     type="button"
@@ -392,16 +490,29 @@ export default function RulesView() {
                                             className="mt-1 h-5 w-5 cursor-pointer rounded-md border border-gray-300"
                                         />
                                         <div className="min-w-0">
-                                            <div className="font-semibold text-gray-800">{ruleSet.name}</div>
+                                            <div className="font-semibold text-gray-800 flex items-center gap-2">
+                                                {ruleSet.name}
+                                                {ruleSet.kind === 'general' && (
+                                                    <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-purple-100 text-purple-700 rounded-full">
+                                                        {t('generalRuleBadge')}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-xs text-gray-500 mt-1">
                                                 Source: {ruleSet.source?.providerName || 'Provider'} {ruleSet.source?.kind === 'manual' ? '· Manual' : ''}
                                             </div>
                                             <div className="text-xs text-gray-500">
                                                 Updated: {formatUpdatedAt(ruleSet.updatedAt)}
                                             </div>
-                                            <div className="text-xs text-gray-500 mt-2">
-                                                Domains {ruleSet.rules?.domain_suffix?.length || 0} · Keywords {ruleSet.rules?.domain_keyword?.length || 0} · CIDRs {ruleSet.rules?.ip_cidr?.length || 0}
-                                            </div>
+                                            {ruleSet.kind === 'general' ? (
+                                                <div className="text-xs text-gray-500 mt-2">
+                                                    {t('generalRuleSkipProxyShort')} {ruleSet.rules?.general?.skip_proxy?.length || 0} · {t('generalRuleTunRoutesShort')} {ruleSet.rules?.general?.tun_excluded_routes?.length || 0}
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-gray-500 mt-2">
+                                                    Domains {ruleSet.rules?.domain_suffix?.length || 0} · Keywords {ruleSet.rules?.domain_keyword?.length || 0} · CIDRs {ruleSet.rules?.ip_cidr?.length || 0}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="ml-4 flex items-center">
                                             <button
@@ -470,7 +581,7 @@ export default function RulesView() {
                     <button
                         type="button"
                         onClick={saveDraftRuleSet}
-                        disabled={isSavingRuleSet || !draftRuleSet.name.trim()}
+                        disabled={isSavingRuleSet || !draftRuleSet.name.trim() || (draftRuleSet.kind === 'general' && splitRuleValues(draftRuleSet.skip_proxy).length === 0 && splitRuleValues(draftRuleSet.tun_excluded_routes).length === 0)}
                         className="px-4 py-2 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="16" /><line x1="8" x2="16" y1="12" y2="12" /></svg>
@@ -490,18 +601,22 @@ export default function RulesView() {
                             />
                         </div>
 
-                        {RULE_SET_FIELDS.map((field) => (
-                            <div key={field}>
-                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                                    {ruleFieldLabel(field)}
-                                </label>
-                                <input
-                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    value={draftRuleSet[field]}
-                                    onChange={e => updateDraftRuleSet(field, e.target.value)}
-                                />
-                            </div>
-                        ))}
+                        {renderKindToggle(draftRuleSet, updateDraftRuleSet)}
+
+                        {draftRuleSet.kind === 'general'
+                            ? renderGeneralFields(draftRuleSet, updateDraftRuleSet)
+                            : RULE_SET_FIELDS.map((field) => (
+                                <div key={field}>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                        {ruleFieldLabel(field)}
+                                    </label>
+                                    <input
+                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        value={draftRuleSet[field]}
+                                        onChange={e => updateDraftRuleSet(field, e.target.value)}
+                                    />
+                                </div>
+                            ))}
                     </div>
 
                     {customRules.length > 0 && (

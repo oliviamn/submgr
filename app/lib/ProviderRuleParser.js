@@ -60,6 +60,7 @@ function createEmptyRuleSet(rawName, format) {
   const normalizedName = ProviderRuleParser.normalizeRuleName(rawName);
 
   return {
+    kind: 'routing',
     name: normalizedName,
     displayName: rawName?.trim() || normalizedName,
     outbound: normalizedName,
@@ -73,6 +74,10 @@ function createEmptyRuleSet(rawName, format) {
         surge: [],
         clash: [],
       },
+      general: {
+        skip_proxy: [],
+        tun_excluded_routes: [],
+      },
     },
   };
 }
@@ -81,6 +86,7 @@ function normalizeRuleSets(ruleSets = []) {
   return ruleSets
     .map(ruleSet => ({
       ...ruleSet,
+      kind: ruleSet.kind === 'general' ? 'general' : 'routing',
       name: ProviderRuleParser.normalizeRuleName(ruleSet.name || ruleSet.outbound || ruleSet.displayName),
       displayName: ruleSet.displayName || ruleSet.name || ruleSet.outbound,
       outbound: ProviderRuleParser.normalizeRuleName(ruleSet.outbound || ruleSet.name || ruleSet.displayName),
@@ -92,6 +98,10 @@ function normalizeRuleSets(ruleSets = []) {
         remote_sources: {
           surge: uniqueRemoteSources(ruleSet.rules?.remote_sources?.surge),
           clash: uniqueRemoteSources(ruleSet.rules?.remote_sources?.clash),
+        },
+        general: {
+          skip_proxy: uniqueStrings(ruleSet.rules?.general?.skip_proxy),
+          tun_excluded_routes: uniqueStrings(ruleSet.rules?.general?.tun_excluded_routes),
         },
       },
     }))
@@ -106,7 +116,15 @@ function normalizeRuleSets(ruleSets = []) {
         ruleSet.rules.remote_sources.surge.length > 0 ||
         ruleSet.rules.remote_sources.clash.length > 0;
 
-      return Boolean(ruleSet.name) && (hasInlineRules || hasRemoteRules);
+      const hasGeneralRules =
+        ruleSet.rules.general.skip_proxy.length > 0 ||
+        ruleSet.rules.general.tun_excluded_routes.length > 0;
+
+      if (!ruleSet.name) {
+        return false;
+      }
+
+      return ruleSet.kind === 'general' ? hasGeneralRules : (hasInlineRules || hasRemoteRules);
     });
 }
 
@@ -236,6 +254,7 @@ export class ProviderRuleParser {
 
   static extractSurgeRuleSets(parsedConfig) {
     const ruleSets = new Map();
+    const generalRuleSet = this.extractSurgeGeneralRuleSet(parsedConfig);
 
     parsedConfig.rules.forEach(line => {
       const segments = line.split(',').map(segment => segment.trim());
@@ -284,7 +303,50 @@ export class ProviderRuleParser {
       ruleSets.set(outboundName, record);
     });
 
-    return normalizeRuleSets(Array.from(ruleSets.values()));
+    const normalized = normalizeRuleSets(Array.from(ruleSets.values()));
+    return generalRuleSet ? [generalRuleSet, ...normalized] : normalized;
+  }
+
+  // Extract skip-proxy / tun-excluded-routes (and legacy bypass-tun) from the
+  // Surge [General] section into a single general rule set.
+  static extractSurgeGeneralRuleSet(parsedConfig) {
+    const lines = parsedConfig.sections?.General || parsedConfig.sections?.GENERAL || [];
+    const general = { skip_proxy: [], tun_excluded_routes: [] };
+
+    lines.forEach(line => {
+      const separatorIndex = line.indexOf('=');
+      if (separatorIndex === -1) {
+        return;
+      }
+
+      const key = line.slice(0, separatorIndex).trim().toLowerCase();
+      const values = line.slice(separatorIndex + 1)
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+
+      if (key === 'skip-proxy') {
+        general.skip_proxy.push(...values);
+      } else if (key === 'tun-excluded-routes' || key === 'bypass-tun') {
+        general.tun_excluded_routes.push(...values);
+      }
+    });
+
+    general.skip_proxy = uniqueStrings(general.skip_proxy);
+    general.tun_excluded_routes = uniqueStrings(general.tun_excluded_routes);
+
+    if (general.skip_proxy.length === 0 && general.tun_excluded_routes.length === 0) {
+      return null;
+    }
+
+    return normalizeRuleSets([{
+      kind: 'general',
+      name: 'General',
+      displayName: 'General',
+      outbound: 'General',
+      sourceFormat: 'surge',
+      rules: { general },
+    }])[0] || null;
   }
 
   static extractClashRuleSets(parsedConfig) {

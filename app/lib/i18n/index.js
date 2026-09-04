@@ -102,7 +102,18 @@ const translations = {
     enableSubscription: '启用订阅',
     nodesCount: '个节点',
     subscriptionEnabled: '已启用',
-    subscriptionDisabled: '已禁用'
+    subscriptionDisabled: '已禁用',
+    ruleSetKindLabel: '规则集类型',
+    ruleSetKindRouting: '路由规则',
+    ruleSetKindGeneral: '通用规则 (skip-proxy / bypass-tun)',
+    generalRuleSkipProxyLabel: 'Skip Proxy（域名 / IP / CIDR，逗号分隔）',
+    generalRuleSkipProxyPlaceholder: '例如：*.example.com, 192.168.1.0/24',
+    generalRuleTunRoutesLabel: 'TUN 排除路由 / bypass-tun（仅 CIDR，逗号分隔）',
+    generalRuleTunRoutesPlaceholder: '例如：192.168.0.0/16, 10.0.0.0/8',
+    generalRuleBadge: '通用',
+    generalRuleSkipProxyShort: 'Skip-proxy',
+    generalRuleTunRoutesShort: 'TUN 路由',
+    generalRuleInvalidCidr: 'TUN 排除路由必须是 CIDR 格式（例如 192.168.0.0/16）'
   },
   'en-US': {
     missingInput: 'Missing input parameter',
@@ -204,7 +215,18 @@ const translations = {
     enableSubscription: 'Enable Subscription',
     nodesCount: 'nodes',
     subscriptionEnabled: 'Enabled',
-    subscriptionDisabled: 'Disabled'
+    subscriptionDisabled: 'Disabled',
+    ruleSetKindLabel: 'Rule Set Kind',
+    ruleSetKindRouting: 'Routing',
+    ruleSetKindGeneral: 'General (skip-proxy / bypass-tun)',
+    generalRuleSkipProxyLabel: 'Skip Proxy (domains / IPs / CIDRs, comma-separated)',
+    generalRuleSkipProxyPlaceholder: 'e.g., *.example.com, 192.168.1.0/24',
+    generalRuleTunRoutesLabel: 'TUN Excluded Routes / bypass-tun (CIDRs only, comma-separated)',
+    generalRuleTunRoutesPlaceholder: 'e.g., 192.168.0.0/16, 10.0.0.0/8',
+    generalRuleBadge: 'General',
+    generalRuleSkipProxyShort: 'Skip-proxy',
+    generalRuleTunRoutesShort: 'TUN routes',
+    generalRuleInvalidCidr: 'TUN excluded routes must be CIDR entries (e.g., 192.168.0.0/16)'
   },
   'fa': {
     missingInput: 'پارامتر ورودی وجود ندارد',
@@ -285,7 +307,18 @@ const translations = {
       'GLOBAL': 'GLOBAL'
     },
     UASettings: 'Custom UserAgent',
-    UAtip: 'By default it will use curl/7.74.0'
+    UAtip: 'By default it will use curl/7.74.0',
+    ruleSetKindLabel: 'نوع مجموعه قوانین',
+    ruleSetKindRouting: 'مسیریابی',
+    ruleSetKindGeneral: 'عمومی (skip-proxy / bypass-tun)',
+    generalRuleSkipProxyLabel: 'Skip Proxy (دامنه‌ها / IP / CIDR، جدا شده با کاما)',
+    generalRuleSkipProxyPlaceholder: 'برای مثال: *.example.com, 192.168.1.0/24',
+    generalRuleTunRoutesLabel: 'مسیرهای حذف‌شده TUN / bypass-tun (فقط CIDR، جدا شده با کاما)',
+    generalRuleTunRoutesPlaceholder: 'برای مثال: 192.168.0.0/16, 10.0.0.0/8',
+    generalRuleBadge: 'عمومی',
+    generalRuleSkipProxyShort: 'Skip-proxy',
+    generalRuleTunRoutesShort: 'مسیرهای TUN',
+    generalRuleInvalidCidr: 'مسیرهای حذف‌شده TUN باید به فرمت CIDR باشند (مثلاً 192.168.0.0/16)'
   }
 };
 

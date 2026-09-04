@@ -97,6 +97,7 @@ function normalizeRuleSet(ruleSet = {}, existingRuleSet = {}) {
   return {
     ...safeExistingRuleSet,
     ...ruleSet,
+    kind: ruleSet.kind === 'general' ? 'general' : 'routing',
     name: ruleSet.name || ruleSet.outbound || safeExistingRuleSet.name,
     displayName: ruleSet.displayName || ruleSet.name || safeExistingRuleSet.displayName || safeExistingRuleSet.name,
     outbound: ruleSet.outbound || ruleSet.name || safeExistingRuleSet.outbound || safeExistingRuleSet.name,
@@ -118,6 +119,10 @@ function normalizeRuleSet(ruleSet = {}, existingRuleSet = {}) {
         clash: uniqueRemoteSources(
           ruleSet.rules?.remote_sources?.clash || safeExistingRuleSet.rules?.remote_sources?.clash
         ),
+      },
+      general: {
+        skip_proxy: uniqueStrings(ruleSet.rules?.general?.skip_proxy || safeExistingRuleSet.rules?.general?.skip_proxy),
+        tun_excluded_routes: uniqueStrings(ruleSet.rules?.general?.tun_excluded_routes || safeExistingRuleSet.rules?.general?.tun_excluded_routes),
       },
     },
   };

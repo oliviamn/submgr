@@ -2,6 +2,7 @@ import { ProxyParser } from './ProxyParsers.js';
 import { DeepCopy, decodeBase64 } from './utils.js';
 import { t, setLanguage } from './i18n/index.js';
 import { generateRules, getOutbounds, PREDEFINED_RULE_SETS } from './config.js';
+import { isGeneralRuleSet } from './generalRules.js';
 
 export class BaseConfigBuilder {
     constructor(inputString, baseConfig, lang, userAgent, cachedSubscriptionProxies = [], providerRuleSets = []) {
@@ -171,14 +172,24 @@ export class BaseConfigBuilder {
 
     getProviderRuleSetOutbounds() {
         return Array.from(new Set(
-            (this.providerRuleSets || [])
+            this.getRoutingProviderRuleSets()
                 .map(ruleSet => ruleSet?.outbound || ruleSet?.name || ruleSet?.displayName)
                 .filter(Boolean)
         ));
     }
 
+    getGeneralRuleSets() {
+        return (this.providerRuleSets || []).filter(isGeneralRuleSet);
+    }
+
+    // Routing rule sets only — keeps providerRules[index] aligned with
+    // this list in the Surge/Clash builders when resolving remote sources.
+    getRoutingProviderRuleSets() {
+        return (this.providerRuleSets || []).filter(ruleSet => !isGeneralRuleSet(ruleSet));
+    }
+
     getInlineProviderRules() {
-        return (this.providerRuleSets || []).map(ruleSet => ({
+        return this.getRoutingProviderRuleSets().map(ruleSet => ({
             site_rules: ruleSet?.rules?.site_rules || [],
             ip_rules: ruleSet?.rules?.ip_rules || [],
             domain_suffix: ruleSet?.rules?.domain_suffix || [],
